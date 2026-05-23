@@ -200,6 +200,18 @@ public class Model_Inv_Stock_Request_Master extends Model {
         return ((String) getValue("cProcessd")).equals("1");
     }
 
+    public JSONObject setPrintStatus(boolean isProcessed) {
+        return setValue("cPrintxxx", isProcessed ? "1" : "0");
+    }
+
+    public boolean isPrinted() {
+        return ((String) getValue("cPrintxxx")).equals("1");
+    }
+
+    public String getPrintStatus() {
+        return ((String) getValue("cPrintxxx"));
+    }
+
     public JSONObject setTransactionStatus(String transactionStatus) {
         return setValue("cTranStat", transactionStatus);
     }
