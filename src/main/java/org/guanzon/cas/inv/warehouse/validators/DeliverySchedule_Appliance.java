@@ -150,9 +150,6 @@ public class DeliverySchedule_Appliance implements GValidator {
             return poJSON;
         }
 
-        if (poGRider.getUserLevel() <= UserRight.ENCODER) {
-            isRequiredApproval = true;
-        }
 
         poJSON.put("result", "success");
         poJSON.put("isRequiredApproval", isRequiredApproval);
@@ -195,9 +192,6 @@ public class DeliverySchedule_Appliance implements GValidator {
             return poJSON;
         }
 
-        if (poGRider.getUserLevel() <= UserRight.ENCODER) {
-            isRequiredApproval = true;
-        }
         poJSON.put("result", "success");
         poJSON.put("isRequiredApproval", isRequiredApproval);
 

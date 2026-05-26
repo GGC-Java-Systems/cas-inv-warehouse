@@ -96,7 +96,10 @@ public class StockRequest extends Transaction {
     }
 
     public JSONObject SaveTransaction() throws SQLException, GuanzonException, CloneNotSupportedException {
-        return saveTransaction();
+        JSONObject loJSON = new JSONObject();
+        loJSON = saveTransaction();
+        openTransaction(Master().getTransactionNo());
+        return loJSON;
     }
 
     public JSONObject OpenTransaction(String transactionNo) throws CloneNotSupportedException, SQLException, GuanzonException {
@@ -328,13 +331,8 @@ public class StockRequest extends Transaction {
         }
 
 //========================================Authority Check End===============================================
-        poGRider.beginTrans("UPDATE STATUS", "Post Transaction", SOURCE_CODE, Master().getTransactionNo());
+        poGRider.beginTrans("UPDATE STATUS", "Confirm Transaction", SOURCE_CODE, Master().getTransactionNo());
 
-        poJSON = statusChange(poMaster.getTable(), (String) poMaster.getValue("sTransNox"), remarks, lsStatus, !lbConfirm, true);
-        if (!"success".equals((String) poJSON.get("result"))) {
-            poGRider.rollbackTrans();
-            return poJSON;
-        }
         poJSON = saveUpdates(StockRequestStatus.CONFIRMED);
         if (!"success".equals((String) poJSON.get("result"))) {
             poGRider.rollbackTrans();
@@ -350,7 +348,12 @@ public class StockRequest extends Transaction {
         for (Model loDetail : paDetail) {
             Model_Inv_Stock_Request_Detail detail = (Model_Inv_Stock_Request_Detail) loDetail;
             try {
-                loTrans.addDetail((String) poMaster.getValue("sIndstCdx"), detail.getStockId(), lsCondition, detail.getQuantity(), detail.getQuantity(), detail.Inventory().getSellingPrice().doubleValue());
+                if (detail.getStockId() != null) {
+                    if (!detail.getStockId().isEmpty()) {
+                        loTrans.addDetail((String) poMaster.getValue("sIndstCdx"), detail.getStockId(), lsCondition, detail.getQuantity(), detail.getQuantity(), detail.Inventory().getSellingPrice().doubleValue());
+                    }
+                }
+
             } catch (GuanzonException ex) {
                 poJSON = new JSONObject();
 
@@ -376,17 +379,17 @@ public class StockRequest extends Transaction {
         }
 
         poGRider.commitTrans();
-        poJSON = new JSONObject();
-        poJSON.put("result", "success");
+        JSONObject loJSON = new JSONObject();
+        loJSON.put("result", "success");
 
         if (lbConfirm) {
-            poJSON.put("message", "Transaction confirmed successfully.");
+            loJSON.put("message", "Transaction confirmed successfully.");
         } else {
-            poJSON.put("message", "Transaction confirmation request submitted successfully.");
+            loJSON.put("message", "Transaction confirmation request submitted successfully.");
         }
 
         openTransaction(Master().getTransactionNo());
-        return poJSON;
+        return loJSON;
     }
 
     public JSONObject PostTransaction(String remarks) throws ParseException, SQLException, GuanzonException, CloneNotSupportedException {
@@ -434,6 +437,7 @@ public class StockRequest extends Transaction {
 
         poGRider.commitTrans();
 
+        openTransaction(Master().getTransactionNo());
         poJSON = new JSONObject();
         poJSON.put("result", "success");
 
@@ -442,7 +446,6 @@ public class StockRequest extends Transaction {
         } else {
             poJSON.put("message", "Transaction posting request submitted successfully.");
         }
-        openTransaction(Master().getTransactionNo());
 
         return poJSON;
     }
@@ -472,7 +475,7 @@ public class StockRequest extends Transaction {
         }
 
         //change status
-        poGRider.beginTrans("UPDATE STATUS", "Post Transaction", SOURCE_CODE, Master().getTransactionNo());
+        poGRider.beginTrans("UPDATE STATUS", "Cancel Transaction", SOURCE_CODE, Master().getTransactionNo());
 
         poJSON = statusChange(poMaster.getTable(), (String) poMaster.getValue("sTransNox"), remarks, lsStatus, !lbConfirm, true);
         if (!"success".equals((String) poJSON.get("result"))) {
@@ -487,6 +490,7 @@ public class StockRequest extends Transaction {
 
         poGRider.commitTrans();
 
+        openTransaction(Master().getTransactionNo());
         poJSON = new JSONObject();
         poJSON.put("result", "success");
 
@@ -495,7 +499,6 @@ public class StockRequest extends Transaction {
         } else {
             poJSON.put("message", "Transaction cancellation request submitted successfully.");
         }
-        openTransaction(Master().getTransactionNo());
 
         return poJSON;
     }
@@ -629,24 +632,27 @@ public class StockRequest extends Transaction {
             }
 
             poGRider.commitTrans();
-            poJSON = new JSONObject();
-            poJSON.put("result", "success");
+            JSONObject loJSON = new JSONObject();
+            loJSON.put("result", "success");
 
             if (lnCancel) {
-                poJSON.put("message", "Transaction voided successfully.");
+                loJSON.put("message", "Transaction voided successfully.");
             } else {
-                poJSON.put("message", "Transaction void request submitted successfully.");
+                loJSON.put("message", "Transaction void request submitted successfully.");
             }
 
+            openTransaction(Master().getTransactionNo());
+
+            return loJSON;
         } catch (GuanzonException | SQLException | CloneNotSupportedException ex) {
             Logger.getLogger(getClass().getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
             poGRider.rollbackTrans();
             poJSON.put("result", "error");
             poJSON.put("message", MiscUtil.getException(ex));
-        }
-        openTransaction(Master().getTransactionNo());
 
-        return poJSON;
+            return poJSON;
+        }
+
     }
 
     public JSONObject AddDetail() throws CloneNotSupportedException {
@@ -1372,7 +1378,8 @@ public class StockRequest extends Transaction {
         String lsEntryDate = "";
         String lsSQL = " SELECT b.sModified, b.dModified "
                 + " FROM Inv_Stock_Request_Master a "
-                + " LEFT JOIN xxxAuditLogMaster b ON b.sSourceNo = a.sTransNox AND b.sEventNme LIKE 'ADD%NEW' AND b.sRemarksx = " + SQLUtil.toSQL(Master().getTable());
+                + " LEFT JOIN xxxAuditLogMaster b ON"
+                + " b.sSourceNo = a.sTransNox AND b.sEventNme LIKE 'ADD%NEW' AND b.sRemarksx = " + SQLUtil.toSQL(Master().getTable());
         lsSQL = MiscUtil.addCondition(lsSQL, " a.sTransNox =  " + SQLUtil.toSQL(Master().getTransactionNo()));
         System.out.println("Execute SQL : " + lsSQL);
         ResultSet loRS = poGRider.executeQuery(lsSQL);

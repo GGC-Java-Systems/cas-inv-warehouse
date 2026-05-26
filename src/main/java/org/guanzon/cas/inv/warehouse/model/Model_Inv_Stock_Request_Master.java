@@ -42,6 +42,7 @@ public class Model_Inv_Stock_Request_Master extends Model {
             poEntity.updateNull("sSourceCd");
             poEntity.updateNull("sSourceNo");
             poEntity.updateObject("cProcessd", 0);
+            poEntity.updateObject("cPrintxxx", 0);
             poEntity.updateString("cTranStat", StockRequestStatus.OPEN);
             //end - assign default values
 
