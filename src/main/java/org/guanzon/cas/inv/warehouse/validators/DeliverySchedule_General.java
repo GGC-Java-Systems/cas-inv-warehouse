@@ -150,7 +150,6 @@ public class DeliverySchedule_General implements GValidator {
             return poJSON;
         }
 
-        if (poGRider.getUserLevel() <= UserRight.ENCODER) {
         poJSON.put("result", "success");
         poJSON.put("isRequiredApproval", isRequiredApproval);
 
