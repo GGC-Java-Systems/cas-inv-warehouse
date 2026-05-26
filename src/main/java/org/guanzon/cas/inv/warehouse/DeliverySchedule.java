@@ -2,10 +2,13 @@ package org.guanzon.cas.inv.warehouse;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.sql.rowset.CachedRowSet;
 import org.guanzon.appdriver.agent.ShowDialogFX;
 import org.guanzon.appdriver.agent.services.Model;
 import org.guanzon.appdriver.agent.services.Transaction;
@@ -170,10 +173,11 @@ public class DeliverySchedule extends Transaction {
                     byExact ? (byCode ? 0 : 1) : 2);
 
             if (poJSON != null) {
-                return openTransaction((String) poJSON.get("sTransNox"));
-
-//            } else if ("error".equals((String) poJSON.get("result"))) {
-//                return poJSON;
+                if ("error".equals((String) poJSON.get("result"))) {
+                    return poJSON;
+                } else {
+                    return openTransaction((String) poJSON.get("sTransNox"));
+                }
             } else {
                 poJSON = new JSONObject();
                 poJSON.put("result", "error");
@@ -382,11 +386,11 @@ public class DeliverySchedule extends Transaction {
         pnEditMode = EditMode.UNKNOWN;
         pbRecordExist = true;
 //        paMaster = new ArrayList<Model>();
-        poJSON = new JSONObject();
-        poJSON.put("result", "success");
-        poJSON.put("message", "Transaction saved successfully.");
+        JSONObject loJSON = new JSONObject();
+        loJSON.put("result", "success");
+        loJSON.put("message", "Transaction saved successfully.");
         openTransaction(getMaster().getTransactionNo());
-        return poJSON;
+        return loJSON;
     }
 
     public JSONObject UpdateTransaction() {
@@ -488,11 +492,12 @@ public class DeliverySchedule extends Transaction {
 
         poGRider.commitTrans();
 
-        poJSON = new JSONObject();
-        poJSON.put("result", "success");
-        poJSON.put("message", "Transaction confirmed successfully.");
+        JSONObject loJSON = new JSONObject();
+        loJSON.put("result", "success");
+        loJSON.put("message", "Transaction confirmed successfully.");
+
         openTransaction(getMaster().getTransactionNo());
-        return poJSON;
+        return loJSON;
     }
 
     public JSONObject CancelTransaction() throws SQLException, GuanzonException, CloneNotSupportedException {
@@ -540,12 +545,12 @@ public class DeliverySchedule extends Transaction {
 
         poGRider.commitTrans();
 
-        poJSON = new JSONObject();
-        poJSON.put("result", "success");
-        poJSON.put("message", "Transaction cancelled successfully.");
+        JSONObject loJSON = new JSONObject();
+        loJSON.put("result", "success");
+        loJSON.put("message", "Transaction cancelled successfully.");
 
         openTransaction(getMaster().getTransactionNo());
-        return poJSON;
+        return loJSON;
     }
 
     public JSONObject VoidTransaction() throws SQLException, GuanzonException, CloneNotSupportedException {
@@ -593,12 +598,12 @@ public class DeliverySchedule extends Transaction {
 
         poGRider.commitTrans();
 
-        poJSON = new JSONObject();
-        poJSON.put("result", "success");
-        poJSON.put("message", "Transaction voided successfully.");
+        JSONObject loJSON = new JSONObject();
+        loJSON.put("result", "success");
+        loJSON.put("message", "Transaction voided successfully.");
 
         openTransaction(getMaster().getTransactionNo());
-        return poJSON;
+        return loJSON;
     }
 
     public JSONObject searchClusterBranch(int row, String value, boolean byCode) throws SQLException, GuanzonException {
@@ -633,6 +638,8 @@ public class DeliverySchedule extends Transaction {
 //
 //            }
             getDetail(row).setClusterID(loSubClass.getModel().getClusterID());
+        } else {
+            getDetail(row).setClusterID("");
         }
         return poJSON;
 
@@ -726,13 +733,137 @@ public class DeliverySchedule extends Transaction {
 
         poGRider.commitTrans();
 
-        poJSON = new JSONObject();
-        poJSON.put("result", "success");
-        poJSON.put("message", "Transaction posted successfully.");
+        JSONObject loJSON = new JSONObject();
+        loJSON.put("result", "success");
+        loJSON.put("message", "Transaction posted successfully.");
+        openTransaction(getMaster().getTransactionNo());
+        return loJSON;
+    }
 
+    public void ShowStatusHistory() throws SQLException, GuanzonException, Exception {
+        CachedRowSet crs = getStatusHistory();
+
+        crs.beforeFirst();
+
+        while (crs.next()) {
+            switch (crs.getString("cRefrStat")) {
+                case "":
+                    crs.updateString("cRefrStat", "-");
+                    break;
+                case DeliveryScheduleStatus.OPEN:
+                    crs.updateString("cRefrStat", "OPEN");
+                    break;
+                case DeliveryScheduleStatus.CONFIRMED:
+                    crs.updateString("cRefrStat", "CONFIRMED");
+                    break;
+                case DeliveryScheduleStatus.POSTED:
+                    crs.updateString("cRefrStat", "POSTED");
+                    break;
+                case DeliveryScheduleStatus.CANCELLED:
+                    crs.updateString("cRefrStat", "CANCELLED");
+                    break;
+                case DeliveryScheduleStatus.VOID:
+                    crs.updateString("cRefrStat", "VOID");
+                    break;
+
+                default:
+                    char ch = crs.getString("cRefrStat").charAt(0);
+                    String stat = String.valueOf((int) ch - 64);
+
+                    switch (stat) {
+                        case DeliveryScheduleStatus.OPEN:
+                            crs.updateString("cRefrStat", "OPEN");
+                            break;
+                        case DeliveryScheduleStatus.CONFIRMED:
+                            crs.updateString("cRefrStat", "CONFIRMED");
+                            break;
+                        case DeliveryScheduleStatus.POSTED:
+                            crs.updateString("cRefrStat", "POSTED");
+                            break;
+                        case DeliveryScheduleStatus.CANCELLED:
+                            crs.updateString("cRefrStat", "CANCELLED");
+                            break;
+                        case DeliveryScheduleStatus.VOID:
+                            crs.updateString("cRefrStat", "VOID");
+                            break;
+
+                    }
+            }
+            crs.updateRow();
+        }
+
+        JSONObject loJSON = getEntryBy();
+        String entryBy = "";
+        String entryDate = "";
+
+        if ("success".equals((String) loJSON.get("result"))) {
+            entryBy = (String) loJSON.get("sCompnyNm");
+            entryDate = (String) loJSON.get("sEntryDte");
+        }
+
+        showStatusHistoryUI("Inventory Stock Request", (String) poMaster.getValue("sTransNox"), entryBy, entryDate, crs);
+    }
+
+    public JSONObject getEntryBy() throws SQLException, GuanzonException {
+        poJSON = new JSONObject();
+        String lsEntry = "";
+        String lsEntryDate = "";
+        String lsSQL = " SELECT b.sModified, b.dModified "
+                + " FROM Delivery_Schedule_Master a "
+                + " LEFT JOIN xxxAuditLogMaster b ON"
+                + " b.sSourceNo = a.sTransNox AND b.sEventNme LIKE 'ADD%NEW' AND b.sRemarksx = " + SQLUtil.toSQL(getMaster().getTable());
+        lsSQL = MiscUtil.addCondition(lsSQL, " a.sTransNox =  " + SQLUtil.toSQL(getMaster().getTransactionNo()));
+        System.out.println("Execute SQL : " + lsSQL);
+        ResultSet loRS = poGRider.executeQuery(lsSQL);
+        try {
+            if (MiscUtil.RecordCount(loRS) > 0L) {
+                if (loRS.next()) {
+                    if (loRS.getString("sModified") != null && !"".equals(loRS.getString("sModified"))) {
+                        if (loRS.getString("sModified").length() > 10) {
+                            lsEntry = getSysUser(poGRider.Decrypt(loRS.getString("sModified")));
+                        } else {
+                            lsEntry = getSysUser(loRS.getString("sModified"));
+                        }
+                        // Get the LocalDateTime from your result set
+                        LocalDateTime dModified = loRS.getObject("dModified", LocalDateTime.class);
+                        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM-dd-yyyy HH:mm:ss");
+                        lsEntryDate = dModified.format(formatter);
+                    }
+                }
+            }
+            MiscUtil.close(loRS);
+        } catch (SQLException e) {
+            poJSON.put("result", "error");
+            poJSON.put("message", e.getMessage());
+            return poJSON;
+        }
+
+        poJSON.put("result", "success");
+        poJSON.put("sCompnyNm", lsEntry);
+        poJSON.put("sEntryDte", lsEntryDate);
         return poJSON;
     }
 
+    public String getSysUser(String fsId) throws SQLException, GuanzonException {
+        String lsEntry = "";
+        String lsSQL = " SELECT IFNULL(b.sCompnyNm,'') sCompnyNm FROM xxxSysUser a "
+                + " LEFT JOIN Client_Master b ON b.sClientID = a.sEmployNo ";
+        lsSQL = MiscUtil.addCondition(lsSQL, " a.sUserIDxx =  " + SQLUtil.toSQL(fsId));
+        System.out.println("SQL " + lsSQL);
+        ResultSet loRS = poGRider.executeQuery(lsSQL);
+        try {
+            if (MiscUtil.RecordCount(loRS) > 0L) {
+                if (loRS.next()) {
+                    lsEntry = loRS.getString("sCompnyNm");
+                }
+            }
+            MiscUtil.close(loRS);
+        } catch (SQLException e) {
+            poJSON.put("result", "error");
+            poJSON.put("message", e.getMessage());
+        }
+        return lsEntry;
+    }
 //    public JSONObject getCategory() throws SQLException, GuanzonException {
 //        if (!"".equals(psIndustryCode)) {
 //

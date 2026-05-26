@@ -150,10 +150,6 @@ public class DeliverySchedule_LP implements GValidator {
             return poJSON;
         }
 
-        if (poGRider.getUserLevel() <= UserRight.ENCODER) {
-            isRequiredApproval = true;
-        }
-
         poJSON.put("result", "success");
         poJSON.put("isRequiredApproval", isRequiredApproval);
 

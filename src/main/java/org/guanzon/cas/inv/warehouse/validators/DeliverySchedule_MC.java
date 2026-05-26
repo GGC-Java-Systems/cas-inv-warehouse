@@ -152,11 +152,7 @@ public class DeliverySchedule_MC implements GValidator {
             poJSON.put("message", "Detail is not set.");
             return poJSON;
         }
-
-        if (poGRider.getUserLevel() <= UserRight.ENCODER) {
-            isRequiredApproval = true;
-        }
-
+        
         poJSON.put("result", "success");
         poJSON.put("isRequiredApproval", isRequiredApproval);
 
