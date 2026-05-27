@@ -2,6 +2,8 @@ package org.guanzon.cas.inv.warehouse;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
@@ -10,6 +12,7 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javafx.application.Platform;
+import javax.sql.rowset.CachedRowSet;
 import net.sf.jasperreports.engine.JRException;
 import org.guanzon.appdriver.agent.ActionAuthManager;
 import org.guanzon.appdriver.agent.MatrixAuthChecker;
@@ -369,7 +372,7 @@ public class InventoryStockIssuance extends Transaction {
                 + ", b.sClustrDs sClustrDs"
                 + " FROM Cluster_Delivery_Master a "
                 + "     LEFT JOIN Branch_Cluster b ON a.sClustrID = b.sClustrID "
-                + "         AND b.sIndstCdx = " + SQLUtil.toSQL(psIndustryCode);
+                + "         AND b.sIndstCdx = a.sIndstCdx";
     }
 
     public JSONObject OpenTransaction(String transactionNo) throws CloneNotSupportedException, SQLException, GuanzonException {
@@ -667,7 +670,7 @@ public class InventoryStockIssuance extends Transaction {
         if ("error".equals((String) poJSON.get("result"))) {
             return poJSON;
         }
-        
+
         if (!pbWthParent) {
             poGRider.beginTrans("UPDATE STATUS", "PostTransaction", SOURCE_CODE, getMaster().getTransactionNo());
         }
@@ -819,6 +822,10 @@ public class InventoryStockIssuance extends Transaction {
                 }
                 lsSQL = MiscUtil.addCondition(lsSQL, lsCondition);
             }
+            if (!psIndustryCode.isEmpty()) {
+                lsSQL = MiscUtil.addCondition(lsSQL, " a.sIndstCdx = " + SQLUtil.toSQL(psIndustryCode));
+            }
+
             if (!psCategoryCD.isEmpty()) {
                 lsSQL = MiscUtil.addCondition(lsSQL, " a.sCategrCd = " + SQLUtil.toSQL(psCategoryCD));
             }
@@ -833,6 +840,9 @@ public class InventoryStockIssuance extends Transaction {
                     byExact ? (byCode ? 0 : 1) : 2);
 
             if (poJSON != null) {
+                if ("error".equals((String) poJSON.get("result"))) {
+                    return poJSON;
+                }
                 return openTransaction((String) poJSON.get("sTransNox"));
 
 //            } else if ("error".equals((String) poJSON.get("result"))) {
@@ -871,6 +881,9 @@ public class InventoryStockIssuance extends Transaction {
             }
             lsSQL = MiscUtil.addCondition(lsSQL, "a.sDestinat = " + SQLUtil.toSQL(poGRider.getBranchCode()));
 
+            if (!psIndustryCode.isEmpty()) {
+                lsSQL = MiscUtil.addCondition(lsSQL, " a.sIndstCdx = " + SQLUtil.toSQL(psIndustryCode));
+            }
             if (!psCategoryCD.isEmpty()) {
                 lsSQL = MiscUtil.addCondition(lsSQL, " a.sCategrCd = " + SQLUtil.toSQL(psCategoryCD));
             }
@@ -884,6 +897,9 @@ public class InventoryStockIssuance extends Transaction {
                     byExact ? (byCode ? 0 : 1) : 2);
 
             if (poJSON != null) {
+                if ("error".equals((String) poJSON.get("result"))) {
+                    return poJSON;
+                }
                 poJSON = openTransaction((String) poJSON.get("sTransNox"));
 
                 if (!"error".equals((String) poJSON.get("result"))) {
@@ -989,6 +1005,9 @@ public class InventoryStockIssuance extends Transaction {
                 byCode ? 0 : 1);
 
         if (poJSON != null) {
+            if ("error".equals((String) poJSON.get("result"))) {
+                return poJSON;
+            }
             poJSON = loSubClass.openRecord((String) poJSON.get("sClientID"));
 
             if ("success".equals((String) poJSON.get("result"))) {
@@ -1045,6 +1064,9 @@ public class InventoryStockIssuance extends Transaction {
                 byCode ? 0 : 1);
 
         if (poJSON != null) {
+            if ("error".equals((String) poJSON.get("result"))) {
+                return poJSON;
+            }
             poJSON = loSubClass.openRecord((String) poJSON.get("sClientID"));
 
             if ("success".equals((String) poJSON.get("result"))) {
@@ -1103,6 +1125,9 @@ public class InventoryStockIssuance extends Transaction {
                 byCode ? 0 : 1);
 
         if (poJSON != null) {
+            if ("error".equals((String) poJSON.get("result"))) {
+                return poJSON;
+            }
             poJSON = loSubClass.openRecord((String) poJSON.get("sClientID"));
 
             if ("success".equals((String) poJSON.get("result"))) {
@@ -1642,5 +1667,130 @@ public class InventoryStockIssuance extends Transaction {
 
         return poJSON;
 
+    }
+
+    public void ShowStatusHistory() throws SQLException, GuanzonException, Exception {
+        CachedRowSet crs = getStatusHistory();
+
+        crs.beforeFirst();
+
+        while (crs.next()) {
+            switch (crs.getString("cRefrStat")) {
+                case "":
+                    crs.updateString("cRefrStat", "-");
+                    break;
+                case InventoryStockIssuanceStatus.OPEN:
+                    crs.updateString("cRefrStat", "OPEN");
+                    break;
+                case InventoryStockIssuanceStatus.CONFIRMED:
+                    crs.updateString("cRefrStat", "CONFIRMED");
+                    break;
+                case InventoryStockIssuanceStatus.POSTED:
+                    crs.updateString("cRefrStat", "POSTED");
+                    break;
+                case InventoryStockIssuanceStatus.CANCELLED:
+                    crs.updateString("cRefrStat", "CANCELLED");
+                    break;
+                case InventoryStockIssuanceStatus.VOID:
+                    crs.updateString("cRefrStat", "VOID");
+                    break;
+
+                default:
+                    char ch = crs.getString("cRefrStat").charAt(0);
+                    String stat = String.valueOf((int) ch - 64);
+
+                    switch (stat) {
+                        case InventoryStockIssuanceStatus.OPEN:
+                            crs.updateString("cRefrStat", "OPEN");
+                            break;
+                        case InventoryStockIssuanceStatus.CONFIRMED:
+                            crs.updateString("cRefrStat", "CONFIRMED");
+                            break;
+                        case InventoryStockIssuanceStatus.POSTED:
+                            crs.updateString("cRefrStat", "POSTED");
+                            break;
+                        case InventoryStockIssuanceStatus.CANCELLED:
+                            crs.updateString("cRefrStat", "CANCELLED");
+                            break;
+                        case InventoryStockIssuanceStatus.VOID:
+                            crs.updateString("cRefrStat", "VOID");
+                            break;
+
+                    }
+            }
+            crs.updateRow();
+        }
+
+        JSONObject loJSON = getEntryBy();
+        String entryBy = "";
+        String entryDate = "";
+
+        if ("success".equals((String) loJSON.get("result"))) {
+            entryBy = (String) loJSON.get("sCompnyNm");
+            entryDate = (String) loJSON.get("sEntryDte");
+        }
+
+        showStatusHistoryUI("Inventory Issuance History", (String) poMaster.getValue("sTransNox"), entryBy, entryDate, crs);
+    }
+
+    public JSONObject getEntryBy() throws SQLException, GuanzonException {
+        poJSON = new JSONObject();
+        String lsEntry = "";
+        String lsEntryDate = "";
+        String lsSQL = " SELECT b.sModified, b.dModified "
+                + " FROM Cluster_Delivery_Master a "
+                + " LEFT JOIN xxxAuditLogMaster b ON"
+                + " b.sSourceNo = a.sTransNox AND b.sEventNme LIKE 'ADD%NEW' AND b.sRemarksx = " + SQLUtil.toSQL(getMaster().getTable());
+        lsSQL = MiscUtil.addCondition(lsSQL, " a.sTransNox =  " + SQLUtil.toSQL(getMaster().getTransactionNo()));
+        System.out.println("Execute SQL : " + lsSQL);
+        ResultSet loRS = poGRider.executeQuery(lsSQL);
+        try {
+            if (MiscUtil.RecordCount(loRS) > 0L) {
+                if (loRS.next()) {
+                    if (loRS.getString("sModified") != null && !"".equals(loRS.getString("sModified"))) {
+                        if (loRS.getString("sModified").length() > 10) {
+                            lsEntry = getSysUser(poGRider.Decrypt(loRS.getString("sModified")));
+                        } else {
+                            lsEntry = getSysUser(loRS.getString("sModified"));
+                        }
+                        // Get the LocalDateTime from your result set
+                        LocalDateTime dModified = loRS.getObject("dModified", LocalDateTime.class);
+                        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM-dd-yyyy HH:mm:ss");
+                        lsEntryDate = dModified.format(formatter);
+                    }
+                }
+            }
+            MiscUtil.close(loRS);
+        } catch (SQLException e) {
+            poJSON.put("result", "error");
+            poJSON.put("message", e.getMessage());
+            return poJSON;
+        }
+
+        poJSON.put("result", "success");
+        poJSON.put("sCompnyNm", lsEntry);
+        poJSON.put("sEntryDte", lsEntryDate);
+        return poJSON;
+    }
+
+    public String getSysUser(String fsId) throws SQLException, GuanzonException {
+        String lsEntry = "";
+        String lsSQL = " SELECT IFNULL(b.sCompnyNm,'') sCompnyNm FROM xxxSysUser a "
+                + " LEFT JOIN Client_Master b ON b.sClientID = a.sEmployNo ";
+        lsSQL = MiscUtil.addCondition(lsSQL, " a.sUserIDxx =  " + SQLUtil.toSQL(fsId));
+        System.out.println("SQL " + lsSQL);
+        ResultSet loRS = poGRider.executeQuery(lsSQL);
+        try {
+            if (MiscUtil.RecordCount(loRS) > 0L) {
+                if (loRS.next()) {
+                    lsEntry = loRS.getString("sCompnyNm");
+                }
+            }
+            MiscUtil.close(loRS);
+        } catch (SQLException e) {
+            poJSON.put("result", "error");
+            poJSON.put("message", e.getMessage());
+        }
+        return lsEntry;
     }
 }
