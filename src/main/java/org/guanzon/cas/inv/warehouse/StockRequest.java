@@ -107,12 +107,12 @@ public class StockRequest extends Transaction {
     }
 
     public JSONObject UpdateTransaction() {
-        if (Master().getTransactionStatus() == StockRequestStatus.CONFIRMED) {
+        if (Master().getTransactionStatus().equals( StockRequestStatus.CONFIRMED)) {
             poJSON.put("result", "error");
             poJSON.put("message", "Unable to modify processed / confirmed transaction.");
             return poJSON;
         }
-        if (Master().getTransactionStatus() == StockRequestStatus.PROCESSED) {
+        if (Master().getTransactionStatus().equals(  StockRequestStatus.PROCESSED)) {
 
             poJSON.put("result", "error");
             poJSON.put("message", "Unable to modify processed / confirmed transaction.");
