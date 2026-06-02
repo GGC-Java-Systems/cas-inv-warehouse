@@ -50,6 +50,7 @@ public class Model_Inventory_Transfer_Detail extends Model {
             poEntity.updateDouble("nReceived", 0.00d);
             poEntity.updateNull("sOrderNox");
             poEntity.updateNull("sRecvIDxx");
+            poEntity.updateObject("dModified", poGRider.getServerDate());
             ID = poEntity.getMetaData().getColumnLabel(1);
             ID2 = poEntity.getMetaData().getColumnLabel(2);
 
