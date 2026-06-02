@@ -195,6 +195,9 @@ public class DeliverySchedule extends Transaction {
         }
     }
 
+    public JSONObject OpenTransaction(String transactionNo) throws CloneNotSupportedException, SQLException, GuanzonException {
+        return openTransaction(transactionNo);
+    }
     public JSONObject openTransaction(String transactionNo) throws CloneNotSupportedException, SQLException, GuanzonException {
         if (transactionNo.isEmpty()) {
 
@@ -823,9 +826,11 @@ public class DeliverySchedule extends Transaction {
                             lsEntry = getSysUser(poGRider.Decrypt(loRS.getString("sModified")));
                         } else {
                             lsEntry = getSysUser(loRS.getString("sModified"));
+
                         }
                         // Get the LocalDateTime from your result set
-                        LocalDateTime dModified = loRS.getObject("dModified", LocalDateTime.class);
+                        LocalDateTime dModified = loRS.getObject("dModified", LocalDateTime.class
+                        );
                         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM-dd-yyyy HH:mm:ss");
                         lsEntryDate = dModified.format(formatter);
                     }

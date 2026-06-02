@@ -1189,6 +1189,7 @@ public class InventoryStockIssuanceNeo extends Transaction {
                 getDetail(row).setSerialID(loBrowse.getModelInventorySerial().getSerialId());
             }
 
+            getDetail(row).setInventoryCost(Double.parseDouble(loBrowse.getModelInventory().getCost().toString()));
             getDetail(row).setQuantity(1.00);
         }
 
@@ -1234,6 +1235,7 @@ public class InventoryStockIssuanceNeo extends Transaction {
                 getDetail(row).setSerialID(loBrowse.getModelInventorySerial().getSerialId());
             }
 
+            getDetail(row).setInventoryCost(Double.parseDouble(loBrowse.getModelInventory().getCost().toString()));
             getDetail(row).setQuantity(1.00);
         }
 
@@ -1281,6 +1283,7 @@ public class InventoryStockIssuanceNeo extends Transaction {
             getDetail(row).setSerialID(loBrowse.getModelInventorySerial().getSerialId());
         }
 
+        getDetail(row).setInventoryCost(Double.parseDouble(loBrowse.getModelInventory().getCost().toString()));
         getDetail(row).setQuantity(1.00);
 
         return poJSON;
@@ -1601,6 +1604,8 @@ public class InventoryStockIssuanceNeo extends Transaction {
         if (loBrowse.getModelInventorySerial().getSerialId() != null) {
             getDetail(row).setSerialID(loBrowse.getModelInventorySerial().getSerialId());
         }
+
+        getDetail(row).setInventoryCost(Double.parseDouble(loBrowse.getModelInventory().getCost().toString()));
         getDetail(row).setQuantity(1.00);
 
         return poJSON;

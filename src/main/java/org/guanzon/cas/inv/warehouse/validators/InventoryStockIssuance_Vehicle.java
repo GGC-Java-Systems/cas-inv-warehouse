@@ -273,9 +273,9 @@ public class InventoryStockIssuance_Vehicle implements GValidator {
         boolean isRequiredApproval = false;
         poJSON = new JSONObject();
         
-        if (poGRider.getUserLevel() <= UserRight.ENCODER) {
-            isRequiredApproval = true;
-        }
+//        if (poGRider.getUserLevel() <= UserRight.ENCODER) {
+//            isRequiredApproval = true;
+//        }
         poJSON.put("result", "success");
         poJSON.put("isRequiredApproval", isRequiredApproval);
         return poJSON;
