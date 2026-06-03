@@ -226,9 +226,9 @@ public class InventoryStockIssuance_LP implements GValidator {
     private JSONObject validatePosted() {
         poJSON = new JSONObject();
         boolean isRequiredApproval = false;
-        if (poGRider.getUserLevel() <= UserRight.ENCODER) {
-            isRequiredApproval = true;
-        }
+//        if (poGRider.getUserLevel() <= UserRight.ENCODER) {
+//            isRequiredApproval = true;
+//        }
 
         if (poMaster.getReceivedDate() == null) {
             poJSON.put("result", "error");
@@ -273,9 +273,9 @@ public class InventoryStockIssuance_LP implements GValidator {
         boolean isRequiredApproval = false;
         poJSON = new JSONObject();
 
-        if (poGRider.getUserLevel() <= UserRight.ENCODER) {
-            isRequiredApproval = true;
-        }
+//        if (poGRider.getUserLevel() <= UserRight.ENCODER) {
+//            isRequiredApproval = true;
+//        }
         poJSON.put("result", "success");
         poJSON.put("isRequiredApproval", isRequiredApproval);
         return poJSON;

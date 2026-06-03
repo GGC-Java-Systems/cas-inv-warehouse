@@ -215,11 +215,24 @@ public class InventoryStockIssuanceNeo extends Transaction {
 
     public JSONObject UpdateTransaction() {
         poJSON = new JSONObject();
+
         if (InventoryStockIssuanceStatus.CONFIRMED.equals((String) poMaster.getValue("cTranStat"))) {
             poJSON.put("result", "error");
             poJSON.put("message", "Transaction was already confirmed.");
             return poJSON;
         }
+
+        if (InventoryStockIssuanceStatus.CANCELLED.equals((String) poMaster.getValue("cTranStat"))) {
+            poJSON.put("result", "error");
+            poJSON.put("message", "Transaction was already cancelled.");
+            return poJSON;
+        }
+
+        return updateTransaction();
+    }
+
+    public JSONObject UpdateTransactionPosting() {
+        poJSON = new JSONObject();
 
         if (InventoryStockIssuanceStatus.CANCELLED.equals((String) poMaster.getValue("cTranStat"))) {
             poJSON.put("result", "error");
@@ -672,7 +685,13 @@ public class InventoryStockIssuanceNeo extends Transaction {
         }
 
         Model_Inventory_Transfer_Master loMaster = (Model_Inventory_Transfer_Master) this.poMaster;
-
+        loMaster.updateRecord();
+        loMaster.setTransactionStatus(lsStatus);
+        loMaster.setReceivedBy(poGRider.getUserID());
+        if (!"success".equals((String) loMaster.saveRecord().get("result"))) {
+            poGRider.rollbackTrans();
+            return poJSON;
+        }
         String lsCondition = "0";
 
         InventoryTransaction loTrans = new InventoryTransaction(poGRider);
@@ -680,7 +699,12 @@ public class InventoryStockIssuanceNeo extends Transaction {
 
         for (Model loDetail : paDetail) {
             Model_Inventory_Transfer_Detail detail = (Model_Inventory_Transfer_Detail) loDetail;
+            detail.updateRecord();
 
+            if (!"success".equals((String) detail.saveRecord().get("result"))) {
+                poGRider.rollbackTrans();
+                return poJSON;
+            }
             //why int when cSerialize supposedly be a character
             //            if("1".equals((int) detail.getColumn("cSerialze"))){
             if (detail.Inventory().isSerialized()) {
@@ -1126,6 +1150,9 @@ public class InventoryStockIssuanceNeo extends Transaction {
                     byExact ? (byCode ? 0 : 1) : 2);
 
             if (poJSON != null) {
+                if ("error".equals((String) poJSON.get("result"))) {
+                    return poJSON;
+                }
                 poJSON = openTransaction((String) poJSON.get("sTransNox"));
 
                 if (!"error".equals((String) poJSON.get("result"))) {
@@ -1189,6 +1216,7 @@ public class InventoryStockIssuanceNeo extends Transaction {
                 getDetail(row).setSerialID(loBrowse.getModelInventorySerial().getSerialId());
             }
 
+            getDetail(row).setInventoryCost(Double.parseDouble(loBrowse.getModelInventory().getCost().toString()));
             getDetail(row).setQuantity(1.00);
         }
 
@@ -1234,6 +1262,7 @@ public class InventoryStockIssuanceNeo extends Transaction {
                 getDetail(row).setSerialID(loBrowse.getModelInventorySerial().getSerialId());
             }
 
+            getDetail(row).setInventoryCost(Double.parseDouble(loBrowse.getModelInventory().getCost().toString()));
             getDetail(row).setQuantity(1.00);
         }
 
@@ -1281,6 +1310,7 @@ public class InventoryStockIssuanceNeo extends Transaction {
             getDetail(row).setSerialID(loBrowse.getModelInventorySerial().getSerialId());
         }
 
+        getDetail(row).setInventoryCost(Double.parseDouble(loBrowse.getModelInventory().getCost().toString()));
         getDetail(row).setQuantity(1.00);
 
         return poJSON;
@@ -1601,6 +1631,8 @@ public class InventoryStockIssuanceNeo extends Transaction {
         if (loBrowse.getModelInventorySerial().getSerialId() != null) {
             getDetail(row).setSerialID(loBrowse.getModelInventorySerial().getSerialId());
         }
+
+        getDetail(row).setInventoryCost(Double.parseDouble(loBrowse.getModelInventory().getCost().toString()));
         getDetail(row).setQuantity(1.00);
 
         return poJSON;

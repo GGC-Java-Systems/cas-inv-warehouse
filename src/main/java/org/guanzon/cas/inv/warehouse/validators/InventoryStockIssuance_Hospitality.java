@@ -226,9 +226,9 @@ public class InventoryStockIssuance_Hospitality implements GValidator {
     private JSONObject validatePosted() {
         poJSON = new JSONObject();
         boolean isRequiredApproval = false;
-        if (poGRider.getUserLevel() <= UserRight.ENCODER) {
-            isRequiredApproval = true;
-        }
+//        if (poGRider.getUserLevel() <= UserRight.ENCODER) {
+//            isRequiredApproval = true;
+//        }
 
         if (poMaster.getReceivedDate() == null) {
             poJSON.put("result", "error");
