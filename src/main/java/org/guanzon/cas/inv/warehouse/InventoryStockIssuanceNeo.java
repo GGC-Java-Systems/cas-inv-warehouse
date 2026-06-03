@@ -321,8 +321,8 @@ public class InventoryStockIssuanceNeo extends Transaction {
         }
 
         if (InventoryStockIssuanceStatus.CONFIRMED.equals((String) poMaster.getValue("cTranStat"))) {
-            poJSON.put("result", "error");
-            poJSON.put("message", "Transaction was already confirmed.");
+            poJSON.put("result", "success");
+            poJSON.put("message", "Transaction confirmed successfully.");
             return poJSON;
         }
 
@@ -567,6 +567,32 @@ public class InventoryStockIssuanceNeo extends Transaction {
             poJSON.put("message", "No transacton was loaded.");
             return poJSON;
         }
+        //do not allow to post if not confirm/departured if cluster delivery
+        if (getMaster().getOrderNo() != null) {
+            if (!getMaster().getOrderNo().isEmpty()) {
+                String lsSQL = " SELECT cTranStat FROM Cluster_Delivery_Master a "
+                        + "LEFT JOIN Cluster_Delivery_Detail b ON a.sTransNox = b.sTransNox  ";
+                lsSQL = MiscUtil.addCondition(lsSQL, " b.sReferNox =  " + SQLUtil.toSQL(getMaster().getTransactionNo()));
+                System.out.println("SQL " + lsSQL);
+                ResultSet loRS = poGRider.executeQuery(lsSQL);
+                try {
+                    if (MiscUtil.RecordCount(loRS) > 0L) {
+                        loRS.beforeFirst();
+                        if (loRS.next()) {
+                            if (!loRS.getString("cTranStat").equals("1"));
+                            poJSON.put("result", "error");
+                            poJSON.put("message", "Cluster Delivery is not yet confirmed.");
+                            return poJSON;
+                        }
+                    }
+                    MiscUtil.close(loRS);
+                } catch (SQLException e) {
+                    poJSON.put("result", "error");
+                    poJSON.put("message", e.getMessage());
+                    return poJSON;
+                }
+            }
+        }
 
         if (InventoryStockIssuanceStatus.VOID.equals((String) poMaster.getValue("cTranStat"))) {
             poJSON.put("result", "error");
@@ -590,6 +616,7 @@ public class InventoryStockIssuanceNeo extends Transaction {
         if ("error".equals((String) poJSON.get("result"))) {
             return poJSON;
         }
+
         boolean lbConfirm = true;
         String lsStatus = InventoryStockIssuanceStatus.POSTED;
         MatrixAuthChecker check = null;
