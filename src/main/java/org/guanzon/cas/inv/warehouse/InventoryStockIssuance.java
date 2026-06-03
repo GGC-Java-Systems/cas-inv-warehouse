@@ -377,6 +377,7 @@ public class InventoryStockIssuance extends Transaction {
 
     public JSONObject OpenTransaction(String transactionNo) throws CloneNotSupportedException, SQLException, GuanzonException {
         return openTransaction(transactionNo);
+
     }
 
     public JSONObject NewTransaction() throws SQLException, GuanzonException, CloneNotSupportedException {
@@ -401,8 +402,15 @@ public class InventoryStockIssuance extends Transaction {
     }
 
     public JSONObject SaveTransaction() throws SQLException, GuanzonException, CloneNotSupportedException {
-
-        return saveTransaction();
+        JSONObject loJSON = new JSONObject();
+        for (int lnCtr = 0; lnCtr < paDetail.size(); lnCtr++) {
+            poJSON = SaveTransactionDelivery(lnCtr + 1);
+            if ("error".equals((String) poJSON.get("result"))) {
+                return poJSON;
+            }
+        }
+        poJSON = openTransaction(getMaster().getTransactionNo());
+        return poJSON;
     }
 
     public JSONObject SaveTransactionDelivery(int deliveryNo) throws SQLException, GuanzonException, CloneNotSupportedException {
@@ -423,7 +431,7 @@ public class InventoryStockIssuance extends Transaction {
         //commit existing 
         poGRider.commitTrans();
 
-        poJSON = SaveTransaction();
+        poJSON = saveTransaction();
         if (!"error".equals((String) poJSON.get("result"))) {
             poJSON.put("result", "success");
             OpenTransaction((String) poMaster.getValue("sTransNox"));
@@ -435,7 +443,7 @@ public class InventoryStockIssuance extends Transaction {
     }
 
     public JSONObject CancelTransactionDelivery(int deliveryNo) throws SQLException, GuanzonException, CloneNotSupportedException {
-        poGRider.beginTrans("CANCEL STATUS", "SaveTransaction", SOURCE_CODE, getMaster().getTransactionNo());
+        poGRider.beginTrans("CANCEL STATUS", "Cancel Transaction", SOURCE_CODE, getMaster().getTransactionNo());
 
         System.out.println(getDetail(deliveryNo).InventoryTransfer().getMaster().getTransactionNo());
         poJSON = getDetail(deliveryNo).InventoryTransfer().CancelTransaction();
