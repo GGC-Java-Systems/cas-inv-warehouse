@@ -134,7 +134,7 @@
 //        poJSON = ShowDialogFX.Search(poGRider,
 //                getSQ_Browse(),
 //                value,
-//                "ID»Bar Code»Description»Brand»Color»On Hand»Selling Price",
+//                "ID»Barcode»Description»Brand»Color»On Hand»Selling Price",
 //                "sStockIDx»sBarCodex»sDescript»xModelNme»xColorNme»nQtyOnHnd»nSelPrice",
 //                "a.sStockIDx»a.sBarCodex»a.sDescript»IF(IFNULL(c.sDescript, '') = '', '', CONCAT(c.sDescript, '(', c.sModelCde, ')'))»IFNULL(d.sDescript, '')»k.nQtyOnHnd»a.nSelPrice",
 //                byCode ? 0 : 1);
@@ -151,7 +151,7 @@
 //        poJSON = ShowDialogFX.Search(poGRider,
 //                lsSQL,
 //                value,
-//                "Bar Code»Description»Brand»Model»Color»Selling Price»ID",
+//                "Barcode»Description»Brand»Model»Color»Selling Price»ID",
 //                "sBarCodex»sDescript»xBrandNme»xModelNme»xColorNme»nSelPrice»sStockIDx",
 //                "a.sBarCodex»a.sDescript»IFNULL(b.sDescript, '')»IF(IFNULL(c.sDescript, '') = '', '', CONCAT(c.sDescript, '(', c.sModelCde, ')'))»IFNULL(d.sDescript, '')»a.nSelPrice»a.sStockIDx",
 //                byCode ? 0 : 1);
@@ -170,7 +170,7 @@
 //        poJSON = ShowDialogFX.Search(poGRider,
 //                lsSQL,
 //                value,
-//                "Bar Code»Description»Brand»Model»Color»Selling Price»ID",
+//                "Barcode»Description»Brand»Model»Color»Selling Price»ID",
 //                "sBarCodex»sDescript»xBrandNme»xModelNme»xColorNme»nSelPrice»sStockIDx",
 //                "a.sBarCodex»a.sDescript»IFNULL(b.sDescript, '')»IF(IFNULL(c.sDescript, '') = '', '', CONCAT(c.sDescript, '(', c.sModelCde, ')'))»IFNULL(d.sDescript, '')»a.nSelPrice»a.sStockIDx",
 //                byCode ? 0 : 1);
@@ -191,7 +191,7 @@
 //        poJSON = ShowDialogFX.Search(poGRider,
 //                lsSQL,
 //                value,
-//                "Bar Code»Description»Brand»Model»Color»Selling Price»ID",
+//                "Barcode»Description»Brand»Model»Color»Selling Price»ID",
 //                "sBarCodex»sDescript»xBrandNme»xModelNme»xColorNme»nSelPrice»sStockIDx",
 //                "a.sBarCodex»a.sDescript»IFNULL(b.sDescript, '')»IF(IFNULL(c.sDescript, '') = '', '', CONCAT(c.sDescript, '(', c.sModelCde, ')'))»IFNULL(d.sDescript, '')»a.nSelPrice»a.sStockIDx",
 //                byCode ? 0 : 1);
@@ -272,7 +272,7 @@
 //        poJSON = ShowDialogFX.Search(poGRider,
 //                getSQ_Browse(),
 //                value,
-//                "Bar Code»Description»Brand»Model»Color»Measurement»Selling Price»ID",
+//                "Barcode»Description»Brand»Model»Color»Measurement»Selling Price»ID",
 //                "sBarCodex»sDescript»xBrandNme»xModelNme»xColorNme»xMeasurNm»nSelPrice»sStockIDx",
 //                "a.sBarCodex»a.sDescript»IFNULL(b.sDescript, '')»IF(IFNULL(c.sDescript, '') = '', '', CONCAT(c.sDescript, '(', c.sModelCde, ')'))»IFNULL(d.sDescript, '')»IFNULL(e.sMeasurNm, '')»a.nSelPrice»a.sStockIDx",
 //                byCode ? 0 : 1);
@@ -289,7 +289,7 @@
 //        poJSON = ShowDialogFX.Search(poGRider,
 //                lsSQL,
 //                value,
-//                "Bar Code»Description»Brand»Model»Color»Measurement»Selling Price»ID",
+//                "Barcode»Description»Brand»Model»Color»Measurement»Selling Price»ID",
 //                "sBarCodex»sDescript»xBrandNme»xModelNme»xColorNme»xMeasurNm»nSelPrice»sStockIDx",
 //                "a.sBarCodex»a.sDescript»IFNULL(b.sDescript, '')»IF(IFNULL(c.sDescript, '') = '', '', CONCAT(c.sDescript, '(', c.sModelCde, ')'))»IFNULL(d.sDescript, '')»IFNULL(e.sMeasurNm, '')»a.nSelPrice»a.sStockIDx",
 //                byCode ? 0 : 1);
@@ -308,7 +308,7 @@
 //        poJSON = ShowDialogFX.Search(poGRider,
 //                lsSQL,
 //                value,
-//                "Bar Code»Description»Brand»Model»Color»Measurement»Selling Price»ID",
+//                "Barcode»Description»Brand»Model»Color»Measurement»Selling Price»ID",
 //                "sBarCodex»sDescript»xBrandNme»xModelNme»xColorNme»xMeasurNm»nSelPrice»sStockIDx",
 //                "a.sBarCodex»a.sDescript»IFNULL(b.sDescript, '')»IF(IFNULL(c.sDescript, '') = '', '', CONCAT(c.sDescript, '(', c.sModelCde, ')'))»IFNULL(d.sDescript, '')»IFNULL(e.sMeasurNm, '')»a.nSelPrice»a.sStockIDx",
 //                byCode ? 0 : 1);
@@ -329,7 +329,7 @@
 //        poJSON = ShowDialogFX.Search(poGRider,
 //                lsSQL,
 //                value,
-//                "Bar Code»Description»Brand»Model»Color»Measurement»Selling Price»ID",
+//                "Barcode»Description»Brand»Model»Color»Measurement»Selling Price»ID",
 //                "sBarCodex»sDescript»xBrandNme»xModelNme»xColorNme»xMeasurNm»nSelPrice»sStockIDx",
 //                "a.sBarCodex»a.sDescript»IFNULL(b.sDescript, '')»IF(IFNULL(c.sDescript, '') = '', '', CONCAT(c.sDescript, '(', c.sModelCde, ')'))»IFNULL(d.sDescript, '')»IFNULL(e.sMeasurNm, '')»a.nSelPrice»a.sStockIDx",
 //                byCode ? 0 : 1);
