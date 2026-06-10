@@ -3,6 +3,8 @@ package org.guanzon.cas.inv.warehouse.services;
 import org.guanzon.appdriver.base.GRiderCAS;
 import org.guanzon.cas.inv.warehouse.model.Model_Inv_Stock_Request_Detail;
 import org.guanzon.cas.inv.warehouse.model.Model_Inv_Stock_Request_Master;
+import org.guanzon.cas.inv.warehouse.model.Model_Inventory_Count_Detail;
+import org.guanzon.cas.inv.warehouse.model.Model_Inventory_Count_Master;
 
 public class InvWarehouseModels {
     public InvWarehouseModels(GRiderCAS applicationDriver){
@@ -43,8 +45,44 @@ public class InvWarehouseModels {
         return poInvRequestDetail;
     }
     
+    public Model_Inventory_Count_Master InventoryCountMaster(){
+        if (poGRider == null){
+            System.err.println("InvWarehouseModels.InventoryCountMaster: Application driver is not set.");
+            return null;
+        }
+        
+        if (poInventoryCountMaster == null){
+            poInventoryCountMaster = new Model_Inventory_Count_Master();
+            poInventoryCountMaster.setApplicationDriver(poGRider);
+            poInventoryCountMaster.setXML("Model_Inventory_Count_Master");
+            poInventoryCountMaster.setTableName("Inventory_Count_Master");
+            poInventoryCountMaster.initialize();
+        }
+
+        return poInventoryCountMaster;
+    }
+    
+    public Model_Inventory_Count_Detail InventoryCountDetail(){
+        if (poGRider == null){
+            System.err.println("InvWarehouseModels.ModelInventoryCountDetail: Application driver is not set.");
+            return null;
+        }
+        
+        if (poInventoryCountDetail == null){
+            poInventoryCountDetail = new Model_Inventory_Count_Detail();
+            poInventoryCountDetail.setApplicationDriver(poGRider);
+            poInventoryCountDetail.setXML("Model_Inventory_Count_Detail");
+            poInventoryCountDetail.setTableName("Inventory_Count_Detail");
+            poInventoryCountDetail.initialize();
+        }
+
+        return poInventoryCountDetail;
+    }
+    
     private final GRiderCAS poGRider;
     
     private Model_Inv_Stock_Request_Master poInvRequestMaster;
     private Model_Inv_Stock_Request_Detail poInvRequestDetail;
+    private Model_Inventory_Count_Master poInventoryCountMaster;
+    private Model_Inventory_Count_Detail poInventoryCountDetail;
 }
