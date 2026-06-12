@@ -186,7 +186,7 @@ public class Model_Inventory_Count_Detail extends Model {
         return setValue("sRemarksx", remarks);
     }
 
-    public String getNote() {
+    public String getRemarks() {
         return (String) getValue("sRemarksx");
     }
 

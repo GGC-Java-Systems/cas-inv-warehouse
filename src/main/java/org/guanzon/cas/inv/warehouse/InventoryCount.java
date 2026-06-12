@@ -30,8 +30,11 @@ import org.guanzon.appdriver.base.GuanzonException;
 import org.guanzon.appdriver.base.MiscUtil;
 import org.guanzon.appdriver.base.SQLUtil;
 import org.guanzon.appdriver.constant.EditMode;
+import org.guanzon.appdriver.constant.RecordStatus;
 import org.guanzon.appdriver.constant.UserRight;
 import org.guanzon.appdriver.iface.GValidator;
+import org.guanzon.cas.client.model.Model_Client_Master;
+import org.guanzon.cas.client.services.ClientModels;
 import org.guanzon.cas.inv.InvMaster;
 import org.json.simple.JSONObject;
 import org.guanzon.cas.inv.warehouse.status.InventoryCountStatus;
@@ -44,6 +47,8 @@ import org.guanzon.cas.inv.warehouse.report.ReportUtilListener;
 import org.guanzon.cas.inv.warehouse.services.InvWarehouseModels;
 import org.guanzon.cas.inv.warehouse.status.InventoryCountPrint;
 import org.guanzon.cas.inv.warehouse.validators.InventoryIssuanceValidatorFactory;
+import org.guanzon.cas.parameter.InventoryCountType;
+import org.guanzon.cas.parameter.services.ParamControllers;
 import org.json.simple.JSONArray;
 
 public class InventoryCount extends Transaction {
@@ -1827,6 +1832,66 @@ public class InventoryCount extends Transaction {
         poJSON.put("message", (lnCtr - 1) + " item(s) successfully generated.");
         return poJSON;
     }
-    
-    
+
+    public JSONObject searchRequestBy(String value, boolean byCode) throws SQLException, GuanzonException {
+        poJSON = new JSONObject();
+        Model_Client_Master loSubClass = new ClientModels(poGRider).ClientMaster();
+        loSubClass.setRecordStatus(RecordStatus.ACTIVE);
+
+        String lsSQL = "SELECT"
+                + " b.sClientID,"
+                + " b.sCompnyNm,"
+                + " b.sLastName,"
+                + " b.sFrstName,"
+                + " b.sMiddName,"
+                + " b.sMaidenNm"
+                + " FROM GGC_iSysDBF.Employee_Master001 a"
+                + " LEFT JOIN Client_Master b ON a.sEmployID = b.sClientID"
+                + "  WHERE a.cRecdStat = " + SQLUtil.toSQL(RecordStatus.ACTIVE)
+                + "  AND b.sClientID <> ''";
+
+//        lsSQL = MiscUtil.addCondition(lsSQL, "a.sBranchCd = " + SQLUtil.toSQL(poGRider.getBranchCode()));
+        System.out.println("Search Query is = " + lsSQL);
+        poJSON = ShowDialogFX.Search(poGRider,
+                lsSQL,
+                value,
+                "Employee ID»Name",
+                "sClientID»sCompnyNm",
+                "b.sClientID»b.sCompnyNm",
+                byCode ? 0 : 1);
+
+        if (poJSON != null) {
+            if ("error".equals((String) poJSON.get("result"))) {
+                return poJSON;
+            }
+            poJSON = loSubClass.openRecord((String) poJSON.get("sClientID"));
+
+            if ("success".equals((String) poJSON.get("result"))) {
+                getMaster().setRequestedBy(loSubClass.getClientId());
+            }
+            return poJSON;
+        } else {
+            poJSON = new JSONObject();
+            poJSON.put("result", "error");
+            poJSON.put("message", "No record loaded.");
+            return poJSON;
+
+        }
+    }
+
+    public JSONObject searchInventoryCountType(String value, boolean byCode) throws SQLException, GuanzonException {
+        poJSON = new JSONObject();
+        InventoryCountType loSubClass = new ParamControllers(poGRider, logwrapr).InventoryCountType();
+        loSubClass.setRecordStatus(RecordStatus.ACTIVE);
+
+        poJSON = loSubClass.searchRecord(value, byCode);
+
+        System.out.println("result " + (String) poJSON.get("result"));
+        if ("success".equals((String) poJSON.get("result"))) {
+
+            getMaster().setInventoryCounterID(loSubClass.getModel().getInventoryCountID());
+        }
+        return poJSON;
+    }
+
 }
