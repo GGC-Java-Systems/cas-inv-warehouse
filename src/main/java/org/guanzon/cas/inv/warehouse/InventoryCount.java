@@ -1,5 +1,9 @@
 package org.guanzon.cas.inv.warehouse;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
@@ -26,27 +30,29 @@ import org.guanzon.appdriver.agent.ShowDialogFX;
 import org.guanzon.appdriver.agent.ShowMessageFX;
 import org.guanzon.appdriver.agent.services.Model;
 import org.guanzon.appdriver.agent.services.Transaction;
+import org.guanzon.appdriver.agent.systables.Model_Transaction_Attachment;
+import org.guanzon.appdriver.agent.systables.SysTableContollers;
+import org.guanzon.appdriver.agent.systables.TransactionAttachment;
 import org.guanzon.appdriver.base.GuanzonException;
 import org.guanzon.appdriver.base.MiscUtil;
 import org.guanzon.appdriver.base.SQLUtil;
+import org.guanzon.appdriver.base.WebFile;
 import org.guanzon.appdriver.constant.EditMode;
 import org.guanzon.appdriver.constant.RecordStatus;
 import org.guanzon.appdriver.constant.UserRight;
 import org.guanzon.appdriver.iface.GValidator;
 import org.guanzon.cas.client.model.Model_Client_Master;
 import org.guanzon.cas.client.services.ClientModels;
-import org.guanzon.cas.inv.InvMaster;
 import org.json.simple.JSONObject;
 import org.guanzon.cas.inv.warehouse.status.InventoryCountStatus;
 import org.guanzon.cas.inv.InventoryTransaction;
-import org.guanzon.cas.inv.services.InvControllers;
 import org.guanzon.cas.inv.warehouse.model.Model_Inventory_Count_Detail;
 import org.guanzon.cas.inv.warehouse.model.Model_Inventory_Count_Master;
 import org.guanzon.cas.inv.warehouse.report.ReportUtil;
 import org.guanzon.cas.inv.warehouse.report.ReportUtilListener;
 import org.guanzon.cas.inv.warehouse.services.InvWarehouseModels;
 import org.guanzon.cas.inv.warehouse.status.InventoryCountPrint;
-import org.guanzon.cas.inv.warehouse.validators.InventoryIssuanceValidatorFactory;
+import org.guanzon.cas.inv.warehouse.validators.InventoryCountValidatorFactory;
 import org.guanzon.cas.parameter.InventoryCountType;
 import org.guanzon.cas.parameter.services.ParamControllers;
 import org.json.simple.JSONArray;
@@ -58,6 +64,7 @@ public class InventoryCount extends Transaction {
     private String psCategorCD = "";
     private String psApprovalUser = "";
     private List<Model> paMaster;
+    private List<TransactionAttachment> paAttachments;
 
     public void setIndustryID(String industryId) {
         psIndustryCode = industryId;
@@ -126,6 +133,38 @@ public class InventoryCount extends Transaction {
         return loDetail;
     }
 
+    private TransactionAttachment TransactionAttachment()
+            throws SQLException,
+            GuanzonException {
+        return new SysTableContollers(poGRider, null).TransactionAttachment();
+    }
+
+    private List<TransactionAttachment> TransactionAttachmentList() {
+        return paAttachments;
+    }
+
+    public TransactionAttachment TransactionAttachmentList(int row) {
+        return (TransactionAttachment) paAttachments.get(row);
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<Model_Transaction_Attachment> getAttachmentList() {
+        return (List<Model_Transaction_Attachment>) (List<?>) paAttachments;
+    }
+
+    public Model_Transaction_Attachment getAttachmentList(int entryRow) {
+        TransactionAttachment loAttachment = (TransactionAttachment) paAttachments.get(entryRow);
+        return loAttachment.getModel();
+    }
+
+    public int getTransactionAttachmentCount() {
+        if (paAttachments == null) {
+            paAttachments = new ArrayList<>();
+        }
+
+        return paAttachments.size();
+    }
+
     public JSONObject initTransaction() throws GuanzonException, SQLException {
         SOURCE_CODE = "Dlvr";
 
@@ -133,6 +172,7 @@ public class InventoryCount extends Transaction {
         poDetail = new InvWarehouseModels(poGRider).InventoryCountDetail();
         paMaster = new ArrayList<Model>();
         paDetail = new ArrayList<Model>();
+        paAttachments = new ArrayList<>();
         initSQL();
 
         return super.initialize();
@@ -145,10 +185,9 @@ public class InventoryCount extends Transaction {
                 + ", a.dTransact"
                 + ", b.sDescript"
                 + ", c.sBranchNm"
-                + ", c.sCompnyNm sCompnyNm"
                 + ", a.nCounterx"
                 + " FROM Inventory_Count_Master a "
-                + "     LEFT JOIN Iinventory_Count_Type b ON a.sInvCtrID = b.sInvCtrID"
+                + "     LEFT JOIN Inventory_Count_Type b ON a.sInvCtrID = b.sInvCtrID"
                 + "     LEFT JOIN Branch c ON a.sBranchCd = c.sBranchCd";
     }
 
@@ -232,7 +271,7 @@ public class InventoryCount extends Transaction {
         psApprovalUser = "";
 
         poJSON = new JSONObject();
-        GValidator loValidator = InventoryIssuanceValidatorFactory.make(psIndustryCode);
+        GValidator loValidator = InventoryCountValidatorFactory.make(psIndustryCode);
 
         loValidator.setApplicationDriver(poGRider);
         loValidator.setTransactionStatus(status);
@@ -1207,12 +1246,12 @@ public class InventoryCount extends Transaction {
         poReportJasper.addParameter("DatePrinted", SQLUtil.dateFormat(poGRider.getServerDate(), SQLUtil.FORMAT_TIMESTAMP));
         poReportJasper.addParameter("watermarkImagePath", poGRider.getReportPath() + "images\\blank.png");
 
-        poReportJasper.setReportName("Inventory Issuance");
+        poReportJasper.setReportName("Inventory Count");
         poReportJasper.setJasperPath(InventoryCountPrint.getJasperReport(psIndustryCode));
 
         //process by ResultSet
         String lsSQL = InventoryCountPrint.PrintRecordQuery();
-        lsSQL = MiscUtil.addCondition(lsSQL, "InventoryTransferMaster.sTransNox = " + SQLUtil.toSQL(getMaster().getTransactionNo()));
+        lsSQL = MiscUtil.addCondition(lsSQL, "InventoryCountMaster.sTransNox = " + SQLUtil.toSQL(getMaster().getTransactionNo()));
 
         poReportJasper.setSQLReport(lsSQL);
 
@@ -1485,7 +1524,7 @@ public class InventoryCount extends Transaction {
             entryDate = (String) loJSON.get("sEntryDte");
         }
 
-        showStatusHistoryUI("Inventory Issuance History", (String) poMaster.getValue("sTransNox"), entryBy, entryDate, crs);
+        showStatusHistoryUI("Inventory Count History", (String) poMaster.getValue("sTransNox"), entryBy, entryDate, crs);
     }
 
     public JSONObject getEntryBy() throws SQLException, GuanzonException {
@@ -1555,7 +1594,7 @@ public class InventoryCount extends Transaction {
             poJSON.put("message", "No Branch found.");
             return poJSON;
         }
-
+        String lsSQL;
         // ─── Build period condition for exclusion ─────────────────────────────
         String lsPeriodCondition = "";
         switch (getMaster().InventoryCountType().getPeriod()) {
@@ -1576,22 +1615,23 @@ public class InventoryCount extends Transaction {
 
         // ─── Build exclusion set (stock IDs already counted in the period) ────
         Set<String> loExcludedStocks = new HashSet<>();
-
-        String lsSQL = "SELECT b.sStockIDx"
-                + " FROM Inventory_Count_Master a"
-                + " INNER JOIN Inventory_Count_Detail b ON a.sTransNox = b.sTransNox"
-                + " WHERE a.sBranchCd = " + SQLUtil.toSQL(poGRider.getBranchCode());
-
+        //if period allow all 
         if (!lsPeriodCondition.isEmpty()) {
-            lsSQL += " AND " + lsPeriodCondition;
-        }
+            lsSQL = "SELECT b.sStockIDx"
+                    + " FROM Inventory_Count_Master a"
+                    + " INNER JOIN Inventory_Count_Detail b ON a.sTransNox = b.sTransNox"
+                    + " WHERE a.sBranchCd = " + SQLUtil.toSQL(poGRider.getBranchCode());
 
-        System.out.println("Exclusion query: " + lsSQL);
-        ResultSet loRSExist = poGRider.executeQuery(lsSQL);
-        while (loRSExist.next()) {
-            loExcludedStocks.add(loRSExist.getString("sStockIDx"));
-        }
+            if (!lsPeriodCondition.isEmpty()) {
+                lsSQL += " AND " + lsPeriodCondition;
+            }
 
+            System.out.println("Exclusion query: " + lsSQL);
+            ResultSet loRSExist = poGRider.executeQuery(lsSQL);
+            while (loRSExist.next()) {
+                loExcludedStocks.add(loRSExist.getString("sStockIDx"));
+            }
+        }
         // ─── Read sample size once – used as both group count and items-per-group ─
         int lnSample = getMaster().InventoryCountType().getQuantity();
 
@@ -1602,22 +1642,22 @@ public class InventoryCount extends Transaction {
 
         lsSQL = "SELECT"
                 + "   a.sStockIDx"
-                + " , b.sBranchCd"
+                + " , a.sBranchCd"
                 + " , b.sIndstCdx"
-                + " , b.sWHouseID"
-                + " , b.sLocatnID"
-                + " , b.sBinNumbr" // grouping key for BB case
-                + " , b.cClassify" // grouping key for C  case
+                + " , a.sWHouseID"
+                + " , a.sLocatnID"
+                + " , a.sBinNumbr" // grouping key for BB case
+                + " , a.cClassify" // grouping key for C  case
                 + " FROM Inv_Master a"
                 + " INNER JOIN Inventory b ON a.sStockIDx = b.sStockIDx"
-                + " WHERE b.sBranchCd = " + SQLUtil.toSQL(poGRider.getBranchCode());
+                + " WHERE a.sBranchCd = " + SQLUtil.toSQL(poGRider.getBranchCode());
 
         if (!psIndustryCode.isEmpty()) {
-            lsSQL += " AND b.sIndstCdx = " + SQLUtil.toSQL(psIndustryCode);
+            lsSQL += " AND a.sIndstCdx = " + SQLUtil.toSQL(psIndustryCode);
         }
-        if (!psCategorCD.isEmpty()) {
-            lsSQL += " AND a.sCategrCd = " + SQLUtil.toSQL(psCategorCD);
-        }
+//        if (!psCategorCD.isEmpty()) {
+//            lsSQL += " AND b.sCategrCd = " + SQLUtil.toSQL(psCategorCD);
+//        }
 
         // Pre-filter at DB level: only fetch rows relevant to the inclusion type
         switch (lsIncluded) {
@@ -1894,4 +1934,159 @@ public class InventoryCount extends Transaction {
         return poJSON;
     }
 
+    public JSONObject loadAttachments()
+            throws SQLException,
+            GuanzonException {
+        poJSON = new JSONObject();
+        paAttachments = new ArrayList<>();
+
+        TransactionAttachment loAttachment = new SysTableContollers(poGRider, null).TransactionAttachment();
+        List loList = loAttachment.getAttachments(SOURCE_CODE, getMaster().getTransactionNo());
+        for (int lnCtr = 0; lnCtr <= loList.size() - 1; lnCtr++) {
+            paAttachments.add(TransactionAttachment());
+            poJSON = paAttachments.get(getTransactionAttachmentCount() - 1).openRecord((String) loList.get(lnCtr));
+            if ("success".equals((String) poJSON.get("result"))) {
+                if (getMaster().getEditMode() == EditMode.UPDATE) {
+                    poJSON = paAttachments.get(getTransactionAttachmentCount() - 1).updateRecord();
+                }
+                System.out.println(paAttachments.get(getTransactionAttachmentCount() - 1).getModel().getTransactionNo());
+                System.out.println(paAttachments.get(getTransactionAttachmentCount() - 1).getModel().getSourceNo());
+                System.out.println(paAttachments.get(getTransactionAttachmentCount() - 1).getModel().getSourceCode());
+                System.out.println(paAttachments.get(getTransactionAttachmentCount() - 1).getModel().getFileName());
+
+                //Download Attachments
+                poJSON = WebFile.DownloadFile(WebFile.getAccessToken(System.getProperty("sys.default.access.token")),
+                        "0032" //Constant
+                        ,
+                         "" //Empty
+                        ,
+                         paAttachments.get(getTransactionAttachmentCount() - 1).getModel().getFileName(),
+                        SOURCE_CODE,
+                        paAttachments.get(getTransactionAttachmentCount() - 1).getModel().getSourceNo(),
+                        "");
+                if ("success".equals((String) poJSON.get("result"))) {
+
+                    poJSON = (JSONObject) poJSON.get("payload");
+                    if (WebFile.Base64ToFile((String) poJSON.get("data"),
+                            (String) poJSON.get("hash"),
+                            System.getProperty("sys.default.path.temp.attachments") + "/",
+                            (String) poJSON.get("filename"))) {
+                        System.out.println("poJSON success: " + poJSON.toJSONString());
+                        System.out.println("File downloaded succesfully.");
+                    } else {
+                        poJSON = (JSONObject) poJSON.get("error");
+                        poJSON.put("result", "error");
+                        System.out.println("ERROR WebFile.DownloadFile: " + poJSON.get("message"));
+                        System.out.println("poJSON error WebFile.DownloadFile: " + poJSON.toJSONString());
+                    }
+
+                } else {
+                    System.out.println("poJSON error WebFile.DownloadFile: " + poJSON.toJSONString());
+                }
+            }
+        }
+        return poJSON;
+    }
+
+    public JSONObject addAttachment()
+            throws SQLException,
+            GuanzonException {
+        poJSON = new JSONObject();
+
+        if (paAttachments.isEmpty()) {
+            paAttachments.add(TransactionAttachment());
+            poJSON = paAttachments.get(getTransactionAttachmentCount() - 1).newRecord();
+        } else {
+            if (!paAttachments.get(paAttachments.size() - 1).getModel().getTransactionNo().isEmpty()) {
+                paAttachments.add(TransactionAttachment());
+            } else {
+                poJSON.put("result", "error");
+                poJSON.put("message", "Unable to add transaction attachment.");
+                return poJSON;
+            }
+        }
+
+        poJSON.put("result", "success");
+        return poJSON;
+
+    }
+
+    public JSONObject removeAttachment(int fnRow) throws GuanzonException, SQLException {
+        poJSON = new JSONObject();
+        if (getTransactionAttachmentCount() <= 0) {
+            poJSON.put("result", "error");
+            poJSON.put("message", "No transaction attachment to be removed.");
+            return poJSON;
+        }
+
+        if (paAttachments.get(fnRow).getEditMode() == EditMode.ADDNEW) {
+            paAttachments.remove(fnRow);
+            System.out.println("Attachment :" + fnRow + " Removed");
+        } else {
+            paAttachments.get(fnRow).getModel().setRecordStatus(RecordStatus.INACTIVE);
+            System.out.println("Attachment :" + fnRow + " Deactivate");
+        }
+
+        poJSON.put("result", "success");
+        return poJSON;
+    }
+
+    public int addAttachment(String fFileName) throws SQLException, GuanzonException {
+        for (int lnCtr = 0; lnCtr <= getTransactionAttachmentCount() - 1; lnCtr++) {
+            if (fFileName.equals(paAttachments.get(lnCtr).getModel().getFileName())
+                    && RecordStatus.INACTIVE.equals(paAttachments.get(lnCtr).getModel().getRecordStatus())) {
+                paAttachments.get(lnCtr).getModel().setRecordStatus(RecordStatus.ACTIVE);
+                System.out.println("Attachment :" + lnCtr + " Activate");
+                return lnCtr;
+            }
+        }
+
+        addAttachment();
+        paAttachments.get(getTransactionAttachmentCount() - 1).getModel().setFileName(fFileName);
+        paAttachments.get(getTransactionAttachmentCount() - 1).getModel().setSourceNo(getMaster().getTransactionNo());
+        paAttachments.get(getTransactionAttachmentCount() - 1).getModel().setRecordStatus(RecordStatus.ACTIVE);
+        return getTransactionAttachmentCount() - 1;
+    }
+
+    public void copyFile(String fsPath) {
+        Path source = Paths.get(fsPath);
+        Path targetDir = Paths.get(System.getProperty("sys.default.path.temp.attachments"));
+
+        try {
+            // Ensure target directory exists
+            if (!Files.exists(targetDir)) {
+                Files.createDirectories(targetDir);
+            }
+
+            // Copy file into the target directory
+            Files.copy(source, targetDir.resolve(source.getFileName()),
+                    StandardCopyOption.REPLACE_EXISTING);
+
+            System.out.println("File copied successfully!");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public JSONObject checkExistingFileName(String fsValue) throws SQLException, GuanzonException {
+        poJSON = new JSONObject();
+
+        String lsSQL = MiscUtil.addCondition(MiscUtil.makeSelect(TransactionAttachment().getModel()), " sFileName = " + SQLUtil.toSQL(fsValue));
+        System.out.println("Executing SQL: " + lsSQL);
+        ResultSet loRS = poGRider.executeQuery(lsSQL);
+        try {
+            if (MiscUtil.RecordCount(loRS) > 0) {
+                if (loRS.next()) {
+                    if (loRS.getString("sFileName") != null && !"".equals(loRS.getString("sFileName"))) {
+                        poJSON.put("result", "error");
+                        poJSON.put("message", "File name already exist in database.\nTry changing the file name to upload.");
+                    }
+                }
+            }
+            MiscUtil.close(loRS);
+        } catch (SQLException e) {
+            System.out.println("No record loaded.");
+        }
+        return poJSON;
+    }
 }

@@ -174,11 +174,6 @@ public class InventoryCount_MC implements GValidator {
                 }
             }
         }
-        if (lnDetailCount <= 0) {
-            poJSON.put("result", "error");
-            poJSON.put("message", "Detail is not set.");
-            return poJSON;
-        }
 
         poJSON.put("result", "success");
         poJSON.put("isRequiredApproval", isRequiredApproval);
