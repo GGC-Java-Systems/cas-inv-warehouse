@@ -1885,7 +1885,7 @@ public class InventoryCount extends Transaction {
                 + " b.sFrstName,"
                 + " b.sMiddName,"
                 + " b.sMaidenNm"
-                + " FROM GGC_iSysDBF.Employee_Master001 a"
+                + " FROM Employee_Master001 a"
                 + " LEFT JOIN Client_Master b ON a.sEmployID = b.sClientID"
                 + "  WHERE a.cRecdStat = " + SQLUtil.toSQL(RecordStatus.ACTIVE)
                 + "  AND b.sClientID <> ''";
