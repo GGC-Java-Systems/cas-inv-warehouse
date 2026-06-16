@@ -640,6 +640,9 @@ public class DeliverySchedule extends Transaction {
 //                }
 //
 //            }
+
+                poJSON = new JSONObject();
+                poJSON.put("result", "success");
             getDetail(row).setClusterID(loSubClass.getModel().getClusterID());
         } else {
             getDetail(row).setClusterID("");

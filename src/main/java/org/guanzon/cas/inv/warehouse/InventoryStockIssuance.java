@@ -944,8 +944,10 @@ public class InventoryStockIssuance extends Transaction {
 
         System.out.println("result " + (String) poJSON.get("result"));
         if ("success".equals((String) poJSON.get("result"))) {
-
             getMaster().setClusterID(loSubClass.getModel().getClusterID());
+
+            poJSON = new JSONObject();
+            poJSON.put("result", "success");
         }
         return poJSON;
     }
@@ -961,6 +963,9 @@ public class InventoryStockIssuance extends Transaction {
         if ("success".equals((String) poJSON.get("result"))) {
 
             getMaster().setTownId(loSubClass.getModel().getTownId());
+
+            poJSON = new JSONObject();
+            poJSON.put("result", "success");
         }
         return poJSON;
     }
@@ -1032,6 +1037,8 @@ public class InventoryStockIssuance extends Transaction {
                 }
 
                 getMaster().setDriverID(loSubClass.getClientId());
+                poJSON = new JSONObject();
+                poJSON.put("result", "success");
             }
             return poJSON;
         } else {
@@ -1093,6 +1100,8 @@ public class InventoryStockIssuance extends Transaction {
                     }
                 }
                 getMaster().setEmploy01(loSubClass.getClientId());
+                poJSON = new JSONObject();
+                poJSON.put("result", "success");
             }
             return poJSON;
         } else {
@@ -1154,6 +1163,8 @@ public class InventoryStockIssuance extends Transaction {
                     }
                 }
                 getMaster().setEmploy02(loSubClass.getClientId());
+                poJSON = new JSONObject();
+                poJSON.put("result", "success");
 
             }
             return poJSON;

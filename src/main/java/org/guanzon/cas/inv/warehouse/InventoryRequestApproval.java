@@ -118,7 +118,7 @@ public class InventoryRequestApproval extends Transaction {
                 + ", a.sTransNox"
                 + " FROM Inv_Stock_Request_Master a"
                 + "     LEFT JOIN Branch_Others b ON a.sBranchCD = b.sBranchCd"
-                + "     LEFT JOIN Branch_Cluster c ON b.sClustrID = c.sClustrID AND a.sIndstCdx = c.sIndstCdx " 
+                + "     LEFT JOIN Branch_Cluster c ON b.sClustrID = c.sClustrID AND a.sIndstCdx = c.sIndstCdx "
                 + "         WHERE a.cTranStat = " + SQLUtil.toSQL(StockRequestStatus.CONFIRMED);
     }
 
@@ -194,6 +194,9 @@ public class InventoryRequestApproval extends Transaction {
         poJSON = loSubClass.searchRecordbyIndustry(value, byCode);
         if ("success".equals((String) poJSON.get("result"))) {
             poCluster = loSubClass.getModel();
+
+            poJSON = new JSONObject();
+            poJSON.put("result", "success");
             return poJSON;
         }
         return poJSON;

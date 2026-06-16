@@ -338,34 +338,34 @@ public class StockRequest extends Transaction {
             poGRider.rollbackTrans();
             return poJSON;
         }
-
-        //maynard - 2026.03.13 14:41
-        InventoryTransaction loTrans = new InventoryTransaction(poGRider);
-
-        loTrans.StockRequest((String) poMaster.getValue("sTransNox"), (Date) poMaster.getValue("dTransact"), false);
-
-        String lsCondition = "0";
-        for (Model loDetail : paDetail) {
-            Model_Inv_Stock_Request_Detail detail = (Model_Inv_Stock_Request_Detail) loDetail;
-            try {
-                if (detail.getStockId() != null) {
-                    if (!detail.getStockId().isEmpty()) {
-                        loTrans.addDetail((String) poMaster.getValue("sIndstCdx"), detail.getStockId(), lsCondition, detail.getQuantity(), detail.getQuantity(), detail.Inventory().getSellingPrice().doubleValue());
-                    }
-                }
-
-            } catch (GuanzonException ex) {
-                poJSON = new JSONObject();
-
-                poGRider.rollbackTrans();
-                poJSON.put("result", "error");
-                poJSON.put("message", ex.getMessage());
-                return poJSON;
-
-            }
-        }
-
-        loTrans.saveTransaction();
+           //update 0616/2026 c/o maam she
+//        //maynard - 2026.03.13 14:41
+//        InventoryTransaction loTrans = new InventoryTransaction(poGRider);
+//
+//        loTrans.StockRequest((String) poMaster.getValue("sTransNox"), (Date) poMaster.getValue("dTransact"), false);
+//
+//        String lsCondition = "0";
+//        for (Model loDetail : paDetail) {
+//            Model_Inv_Stock_Request_Detail detail = (Model_Inv_Stock_Request_Detail) loDetail;
+//            try {
+//                if (detail.getStockId() != null) {
+//                    if (!detail.getStockId().isEmpty()) {
+//                        loTrans.addDetail((String) poMaster.getValue("sIndstCdx"), detail.getStockId(), lsCondition, detail.getQuantity(), detail.getQuantity(), detail.Inventory().getSellingPrice().doubleValue());
+//                    }
+//                }
+//
+//            } catch (GuanzonException ex) {
+//                poJSON = new JSONObject();
+//
+//                poGRider.rollbackTrans();
+//                poJSON.put("result", "error");
+//                poJSON.put("message", ex.getMessage());
+//                return poJSON;
+//
+//            }
+//        }
+//
+//        loTrans.saveTransaction();
 
         //Update status for this transaction
         poJSON = statusChange(poMaster.getTable(), (String) poMaster.getValue("sTransNox"), remarks, lsStatus, !lbConfirm, true);
@@ -598,22 +598,23 @@ public class StockRequest extends Transaction {
 
         //check  the user level again then if he/she allow to approve
         poGRider.beginTrans(
-                "UPDATE STATUS", "Cancel Transaction", SOURCE_CODE, Master().getTransactionNo());
+                "UPDATE STATUS", "Void Transaction", SOURCE_CODE, Master().getTransactionNo());
         try {
-            //kalyptus-2025.10.08 02:52pm
-            //save to inventory ledger
-            if (StockRequestStatus.VOID.equalsIgnoreCase((String) poMaster.getValue("cTranStat"))) {
-                InventoryTransaction loTrans = new InventoryTransaction(poGRider);
-                loTrans.StockRequest((String) poMaster.getValue("sTransNox"), (Date) poMaster.getValue("dTransact"), true);
-
-                for (Model loDetail : paDetail) {
-                    Model_Inv_Stock_Request_Detail detail = (Model_Inv_Stock_Request_Detail) loDetail;
-                    if (!detail.getStockId().isEmpty()) {
-                        loTrans.addDetail((String) detail.getValue("sIndstCdx"), detail.getStockId(), "0", 0, detail.getQuantity(), detail.Inventory().getCost().doubleValue());
-                    }
-                }
-                loTrans.saveTransaction();
-            }
+//            
+//            //kalyptus-2025.10.08 02:52pm
+//            //save to inventory ledger
+//            if (StockRequestStatus.VOID.equalsIgnoreCase((String) poMaster.getValue("cTranStat"))) {
+//                InventoryTransaction loTrans = new InventoryTransaction(poGRider);
+//                loTrans.StockRequest((String) poMaster.getValue("sTransNox"), (Date) poMaster.getValue("dTransact"), true);
+//
+//                for (Model loDetail : paDetail) {
+//                    Model_Inv_Stock_Request_Detail detail = (Model_Inv_Stock_Request_Detail) loDetail;
+//                    if (!detail.getStockId().isEmpty()) {
+//                        loTrans.addDetail((String) detail.getValue("sIndstCdx"), detail.getStockId(), "0", 0, detail.getQuantity(), detail.Inventory().getCost().doubleValue());
+//                    }
+//                }
+//                loTrans.saveTransaction();
+//            }
 
             poJSON = saveUpdates(StockRequestStatus.CONFIRMED);
             if (!"success".equals((String) poJSON.get("result"))) {
@@ -675,6 +676,9 @@ public class StockRequest extends Transaction {
 
         if ("success".equals((String) poJSON.get("result"))) {
             Master().setBranchCode(object.getModel().getBranchCode());
+            
+            poJSON = new JSONObject();
+            poJSON.put("result", "success");
         }
 
         return poJSON;
@@ -688,6 +692,9 @@ public class StockRequest extends Transaction {
 
         if ("success".equals((String) poJSON.get("result"))) {
             Master().setIndustryId(object.getModel().getIndustryId());
+            
+            poJSON = new JSONObject();
+            poJSON.put("result", "success");
         }
 
         return poJSON;
@@ -701,6 +708,9 @@ public class StockRequest extends Transaction {
 
         if ("success".equals((String) poJSON.get("result"))) {
             Master().setCategoryId(object.getModel().getCategoryId());
+            
+            poJSON = new JSONObject();
+            poJSON.put("result", "success");
 
         }
 
@@ -716,6 +726,7 @@ public class StockRequest extends Transaction {
         if ("success".equals((String) poJSON.get("result"))) {
             poJSON.put("brandDesc", brand.getModel().getDescription());
             poJSON.put("brandID", brand.getModel().getBrandId());
+            
         }
         return poJSON;
     }

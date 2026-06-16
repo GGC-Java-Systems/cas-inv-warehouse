@@ -1245,6 +1245,9 @@ public class InventoryStockIssuanceNeo extends Transaction {
 
             getDetail(row).setInventoryCost(Double.parseDouble(loBrowse.getModelInventory().getCost().toString()));
             getDetail(row).setQuantity(1.00);
+
+            poJSON = new JSONObject();
+            poJSON.put("result", "success");
         }
 
         return poJSON;
@@ -1291,6 +1294,9 @@ public class InventoryStockIssuanceNeo extends Transaction {
 
             getDetail(row).setInventoryCost(Double.parseDouble(loBrowse.getModelInventory().getCost().toString()));
             getDetail(row).setQuantity(1.00);
+
+            poJSON = new JSONObject();
+            poJSON.put("result", "success");
         }
 
         return poJSON;
@@ -1340,6 +1346,9 @@ public class InventoryStockIssuanceNeo extends Transaction {
         getDetail(row).setInventoryCost(Double.parseDouble(loBrowse.getModelInventory().getCost().toString()));
         getDetail(row).setQuantity(1.00);
 
+        poJSON = new JSONObject();
+        poJSON.put("result", "success");
+
         return poJSON;
 
     }
@@ -1386,6 +1395,9 @@ public class InventoryStockIssuanceNeo extends Transaction {
 
             if ("success".equals((String) poJSON.get("result"))) {
                 getMaster().setDestination(loBrowse.getBranchCode());
+
+                poJSON = new JSONObject();
+                poJSON.put("result", "success");
                 return poJSON;
             }
 
@@ -1423,6 +1435,9 @@ public class InventoryStockIssuanceNeo extends Transaction {
 
             if ("success".equals((String) poJSON.get("result"))) {
                 getMaster().setTruckId(loBrowse.getClientId());
+
+                poJSON = new JSONObject();
+                poJSON.put("result", "success");
                 return poJSON;
             }
 
@@ -1661,6 +1676,9 @@ public class InventoryStockIssuanceNeo extends Transaction {
 
         getDetail(row).setInventoryCost(Double.parseDouble(loBrowse.getModelInventory().getCost().toString()));
         getDetail(row).setQuantity(1.00);
+
+        poJSON = new JSONObject();
+        poJSON.put("result", "success");
 
         return poJSON;
     }
