@@ -1,5 +1,9 @@
 package org.guanzon.cas.inv.warehouse;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileReader;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -9,6 +13,7 @@ import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
@@ -24,6 +29,7 @@ import java.util.logging.Logger;
 import javafx.application.Platform;
 import javax.sql.rowset.CachedRowSet;
 import net.sf.jasperreports.engine.JRException;
+import org.apache.commons.codec.binary.Base64;
 import org.guanzon.appdriver.agent.ActionAuthManager;
 import org.guanzon.appdriver.agent.MatrixAuthChecker;
 import org.guanzon.appdriver.agent.ShowDialogFX;
@@ -33,7 +39,9 @@ import org.guanzon.appdriver.agent.services.Transaction;
 import org.guanzon.appdriver.agent.systables.Model_Transaction_Attachment;
 import org.guanzon.appdriver.agent.systables.SysTableContollers;
 import org.guanzon.appdriver.agent.systables.TransactionAttachment;
+import org.guanzon.appdriver.base.GRiderCAS;
 import org.guanzon.appdriver.base.GuanzonException;
+import org.guanzon.appdriver.base.MiscReplUtil;
 import org.guanzon.appdriver.base.MiscUtil;
 import org.guanzon.appdriver.base.SQLUtil;
 import org.guanzon.appdriver.base.WebFile;
@@ -41,6 +49,7 @@ import org.guanzon.appdriver.constant.EditMode;
 import org.guanzon.appdriver.constant.RecordStatus;
 import org.guanzon.appdriver.constant.UserRight;
 import org.guanzon.appdriver.iface.GValidator;
+import org.guanzon.appdriver.token.RequestAccess;
 import org.guanzon.cas.client.model.Model_Client_Master;
 import org.guanzon.cas.client.services.ClientModels;
 import org.json.simple.JSONObject;
@@ -56,6 +65,8 @@ import org.guanzon.cas.inv.warehouse.validators.InventoryCountValidatorFactory;
 import org.guanzon.cas.parameter.InventoryCountType;
 import org.guanzon.cas.parameter.services.ParamControllers;
 import org.json.simple.JSONArray;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
 
 public class InventoryCount extends Transaction {
 
@@ -166,7 +177,7 @@ public class InventoryCount extends Transaction {
     }
 
     public JSONObject initTransaction() throws GuanzonException, SQLException {
-        SOURCE_CODE = "Dlvr";
+        SOURCE_CODE = "InvC";
 
         poMaster = new InvWarehouseModels(poGRider).InventoryCountMaster();
         poDetail = new InvWarehouseModels(poGRider).InventoryCountDetail();
@@ -192,12 +203,20 @@ public class InventoryCount extends Transaction {
     }
 
     public JSONObject OpenTransaction(String transactionNo) throws CloneNotSupportedException, SQLException, GuanzonException {
-        return openTransaction(transactionNo);
+        openTransaction(transactionNo);
+
+        poJSON = loadAttachments();
+        if (!isJSONSuccess(poJSON)) {
+            poJSON = setJSON((String) poJSON.get("result"), "Unable to load transaction attachments.\n" + (String) poJSON.get("message"));
+            return poJSON;
+        }
+        return poJSON;
     }
 
     public JSONObject NewTransaction() throws SQLException, GuanzonException, CloneNotSupportedException {
         poJSON = new JSONObject();
         poJSON = newTransaction();
+        paAttachments = new ArrayList<>();
         if ("error".equals((String) poJSON.get("result"))) {
             return poJSON;
         }
@@ -212,8 +231,115 @@ public class InventoryCount extends Transaction {
     public JSONObject SaveTransaction() throws SQLException, GuanzonException, CloneNotSupportedException {
         JSONObject loJSON = new JSONObject();
         loJSON = saveTransaction();
-        openTransaction(getMaster().getTransactionNo());
+        OpenTransaction(getMaster().getTransactionNo());
         return loJSON;
+    }
+
+    @Override
+    public JSONObject saveOthers() {
+
+        //assign other info on attachment
+        for (int lnCtr = 0; lnCtr <= getTransactionAttachmentCount() - 1; lnCtr++) {
+            TransactionAttachmentList(lnCtr).getModel().setSourceNo(getMaster().getTransactionNo());
+            TransactionAttachmentList(lnCtr).getModel().setSourceCode(getSourceCode());
+            TransactionAttachmentList(lnCtr).getModel().setBranchCode(getMaster().getBranchCode());
+            TransactionAttachmentList(lnCtr).getModel().setImagePath(System.getProperty("sys.default.path.temp.attachments"));
+
+            String lsOriginalFileName = TransactionAttachmentList(lnCtr).getModel().getFileName();
+            //Check existing file name in database
+            if (EditMode.ADDNEW == TransactionAttachmentList(lnCtr).getModel().getEditMode()) {
+                int lnCopies = 0;
+                String fsFilePath = TransactionAttachmentList(lnCtr).getModel().getImagePath() + "/" + TransactionAttachmentList(lnCtr).getModel().getFileName();
+                String lsNewFileName = TransactionAttachmentList(lnCtr).getModel().getFileName();
+                try {
+                    while ("error".equals((String) checkExistingFileName(lsNewFileName).get("result"))) {
+                        lnCopies++;
+                        //Rename the file
+                        int dotIndex = TransactionAttachmentList(lnCtr).getModel().getFileName().lastIndexOf(".");
+                        if (dotIndex == -1) {
+                            lsNewFileName = TransactionAttachmentList(lnCtr).getModel().getFileName() + "_" + lnCopies;
+                        } else {
+                            lsNewFileName = TransactionAttachmentList(lnCtr).getModel().getFileName().substring(0, dotIndex) + "_" + lnCopies + TransactionAttachmentList(lnCtr).getModel().getFileName().substring(dotIndex);
+                        }
+                    }
+                } catch (SQLException ex) {
+                    Logger.getLogger(InventoryCount.class.getName()).log(Level.SEVERE, null, ex);
+                } catch (GuanzonException ex) {
+                    Logger.getLogger(InventoryCount.class.getName()).log(Level.SEVERE, null, ex);
+                }
+
+                if (lnCopies > 0) {
+                    Path source = Paths.get(fsFilePath);
+                    try {
+                        // Copy file into the target directory with a new name
+                        Path target = Paths.get(System.getProperty("sys.default.path.temp.attachments")).resolve(lsNewFileName);
+                        Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+                        //check if file is existing
+                        int lnChecker = 0;
+                        File file = new File(TransactionAttachmentList(lnCtr).getModel().getImagePath() + "/" + lsNewFileName);
+                        while (!file.exists() && lnChecker < 5) {
+                            Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+                            System.out.println("Re-Copying... " + lnChecker);
+                            lnChecker++;
+                        }
+                        TransactionAttachmentList(lnCtr).getModel().setFileName(lsNewFileName);
+                        System.out.println("File copied successfully as " + lsNewFileName);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+
+            //Upload Attachment when send status is 0
+            try {
+                if ("0".equals(TransactionAttachmentList(lnCtr).getModel().getSendStatus())) {
+                    poJSON = uploadCASAttachments(poGRider, System.getProperty("sys.default.access.token"), lnCtr, lsOriginalFileName);
+                    if ("error".equals((String) poJSON.get("result"))) {
+                        return poJSON;
+                    }
+                }
+            } catch (Exception ex) {
+                Logger.getLogger(getClass().getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+                poJSON = setJSON("error", MiscUtil.getException(ex));
+                return poJSON;
+            }
+
+        }
+        try {
+            System.out.println("--------------------------SAVE OTHERS---------------------------------------------");
+            System.out.println("Class Edit Mode : " + getEditMode());
+            System.out.println("Master Edit Mode : " + getMaster().getEditMode());
+            System.out.println("-----------------------------------------------------------------------");
+//            for(int lnCtr = 0; lnCtr <= getDetailCount() - 1; lnCtr++){
+//            System.out.println("COUNTER : " + lnCtr);
+//            System.out.println("Transaction No : " + getDetail(lnCtr).getTransactionNo());
+//            System.out.println("Stock ID : " + getDetail(lnCtr).getStockId());
+            System.out.println("-----------------------------------------------------------------------");
+//            }
+
+            //Save Attachments
+            System.out.println("-----------------------------SAVE TRANSACTION ATTACHMENT------------------------------------------");
+            for (int lnCtr = 0; lnCtr <= getTransactionAttachmentCount() - 1; lnCtr++) {
+                if (paAttachments.get(lnCtr).getEditMode() == EditMode.ADDNEW || paAttachments.get(lnCtr).getEditMode() == EditMode.UPDATE) {
+                    paAttachments.get(lnCtr).getModel().setModifyingId(poGRider.Encrypt(poGRider.getUserID()));
+                    paAttachments.get(lnCtr).getModel().setModifiedDate(poGRider.getServerDate());
+                    paAttachments.get(lnCtr).setWithParentClass(true);
+                    poJSON = paAttachments.get(lnCtr).saveRecord();
+                    if (!isJSONSuccess(poJSON)) {
+                        return poJSON;
+                    }
+                }
+            }
+            System.out.println("-----------------------------------------------------------------------");
+
+        } catch (SQLException | GuanzonException | CloneNotSupportedException ex) {
+            Logger.getLogger(getClass().getName()).log(Level.SEVERE, MiscUtil.getException(ex), ex);
+            poJSON = setJSON("error", MiscUtil.getException(ex));
+            return poJSON;
+        }
+
+        poJSON = setJSON("success", "success");
+        return poJSON;
     }
 
     public JSONObject UpdateTransaction() {
@@ -313,7 +439,7 @@ public class InventoryCount extends Transaction {
 
         if (InventoryCountStatus.CONFIRMED.equals((String) poMaster.getValue("cTranStat"))) {
             poJSON.put("result", "success");
-            poJSON.put("message", "Transaction confirmed successfully.");
+//            poJSON.put("message", "Transaction confirmed successfully.");
             return poJSON;
         }
 
@@ -880,16 +1006,16 @@ public class InventoryCount extends Transaction {
             poJSON = ShowDialogFX.Search(poGRider,
                     lsSQL,
                     value,
-                    "Transaction No»Destination»Date",
-                    "sTransNox»xDestinat»dTransact",
-                    "a.sTransNox»e.sBranchNm»a.dTransact",
+                    "Transaction No»Date»Count Type",
+                    "sTransNox»dTransact»sDescript",
+                    "a.sTransNox»a.dTransact»b.sDescript",
                     byExact ? (byCode ? 0 : 1) : 2);
 
             if (poJSON != null) {
                 if ("error".equals((String) poJSON.get("result"))) {
                     return poJSON;
                 }
-                return openTransaction((String) poJSON.get("sTransNox"));
+                return OpenTransaction((String) poJSON.get("sTransNox"));
 
             } else {
                 poJSON = new JSONObject();
@@ -1392,6 +1518,10 @@ public class InventoryCount extends Transaction {
 //
 //        return poJSON;
 //    }
+    public boolean isJSONSuccess(JSONObject foJSON) {
+        return ("success".equals((String) foJSON.get("result")) || !"error".equals((String) foJSON.get("result")));
+    }
+
     private boolean isJSONSuccess(JSONObject loJSON, String module, String fsModule) {
         String result = (String) loJSON.get("result");
         if ("error".equals(result)) {
@@ -1908,7 +2038,10 @@ public class InventoryCount extends Transaction {
 
             if ("success".equals((String) poJSON.get("result"))) {
                 getMaster().setRequestedBy(loSubClass.getClientId());
+                poJSON = new JSONObject();
+                poJSON.put("result", "success");
             }
+
             return poJSON;
         } else {
             poJSON = new JSONObject();
@@ -1930,9 +2063,306 @@ public class InventoryCount extends Transaction {
         if ("success".equals((String) poJSON.get("result"))) {
 
             getMaster().setInventoryCounterID(loSubClass.getModel().getInventoryCountID());
+            poJSON = new JSONObject();
+            poJSON.put("result", "success");
         }
         return poJSON;
     }
+
+    public JSONObject setInclusion(String inclusionValue) throws GuanzonException, SQLException {
+        if (getMaster().getInventoryCounterID().isEmpty()
+                || getMaster().InventoryCountType().getIncluded() == null) {
+            poJSON.put("result", "error");
+            poJSON.put("message", "Please set the default rule first to continue.");
+            return poJSON;
+        }
+
+        // Check if override is already same
+        if (inclusionValue.equals(getMaster().InventoryCountType().getIncluded())) {
+            poJSON.put("result", "error");
+            poJSON.put("message", "Unable to override same existing rule.");
+            return poJSON;
+        }
+
+        if (poGRider.getUserLevel() < UserRight.AUDIT) {
+            poJSON = ShowDialogFX.getUserApproval(poGRider);
+            if ("error".equals((String) poJSON.get("result"))) {
+                return poJSON;
+            } else {
+                if (Integer.parseInt(poJSON.get("nUserLevl").toString()) < UserRight.AUDIT) {
+                    poJSON.put("result", "error");
+                    poJSON.put("message", "User is not an authorized approving officer.");
+                    return poJSON;
+                }
+                psApprovalUser = poJSON.get("sUserIDxx") != null
+                        ? poJSON.get("sUserIDxx").toString()
+                        : poGRider.getUserID();
+            }
+        }
+
+        try {
+            // ─── Step 1: Collect currently active stock IDs in paDetail ──────────
+            Set<String> loCurrentStocks = new HashSet<>();
+            for (int i = 1; i <= paDetail.size(); i++) {
+                String lsStockId = getDetail(i).getStockId();
+                if (lsStockId != null && !lsStockId.isEmpty()) {
+                    loCurrentStocks.add(lsStockId);
+                }
+            }
+
+            if (loCurrentStocks.isEmpty()) {
+                poJSON.put("result", "error");
+                poJSON.put("message", "No existing detail items to override.");
+                return poJSON;
+            }
+
+            // ─── Step 2: Build period exclusion condition ─────────────────────────
+            String lsPeriodCondition = "";
+            switch (getMaster().InventoryCountType().getPeriod()) {
+                case "M":
+                    lsPeriodCondition = "a.dTransact >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)";
+                    break;
+                case "S":
+                    lsPeriodCondition = "a.dTransact >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)";
+                    break;
+                case "A":
+                    lsPeriodCondition = "a.dTransact >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)";
+                    break;
+                case "X":
+                default:
+                    lsPeriodCondition = "";
+                    break;
+            }
+
+            // ─── Step 3: Build period-excluded stocks set ─────────────────────────
+            Set<String> loExcludedStocks = new HashSet<>();
+            if (!lsPeriodCondition.isEmpty()) {
+                String lsExclusionSQL = "SELECT b.sStockIDx"
+                        + " FROM Inventory_Count_Master a"
+                        + " INNER JOIN Inventory_Count_Detail b ON a.sTransNox = b.sTransNox"
+                        + " WHERE a.sBranchCd = " + SQLUtil.toSQL(poGRider.getBranchCode())
+                        + " AND " + lsPeriodCondition;
+
+                ResultSet loRSExist = poGRider.executeQuery(lsExclusionSQL);
+                while (loRSExist.next()) {
+                    loExcludedStocks.add(loRSExist.getString("sStockIDx"));
+                }
+            }
+
+            // ─── Step 4: Fetch ALL candidates from DB ────────────────────────────
+            String lsSQL = "SELECT"
+                    + "   a.sStockIDx"
+                    + " , a.sBranchCd"
+                    + " , b.sIndstCdx"
+                    + " , a.sWHouseID"
+                    + " , a.sLocatnID"
+                    + " , a.sBinNumbr"
+                    + " , a.cClassify"
+                    + " FROM Inv_Master a"
+                    + " INNER JOIN Inventory b ON a.sStockIDx = b.sStockIDx"
+                    + " WHERE a.sBranchCd = " + SQLUtil.toSQL(poGRider.getBranchCode());
+
+            if (!psIndustryCode.isEmpty()) {
+                lsSQL += " AND a.sIndstCdx = " + SQLUtil.toSQL(psIndustryCode);
+            }
+
+            // Pre-filter at DB level for BB and C
+            switch (inclusionValue) {
+                case "BB":
+                    lsSQL += " AND a.sBinNumbr IS NOT NULL AND a.sBinNumbr <> ''";
+                    break;
+                case "C":
+                    lsSQL += " AND a.cClassify IS NOT NULL AND a.cClassify <> ''";
+                    break;
+            }
+
+            ResultSet loRS = poGRider.executeQuery(lsSQL);
+            if (MiscUtil.RecordCount(loRS) <= 0) {
+                poJSON.put("result", "error");
+                poJSON.put("message", "No candidate records found.");
+                return poJSON;
+            }
+
+            // ─── Step 5: Load candidates, exclude period-counted stocks ──────────
+            List<Map<String, String>> loCandidates = new ArrayList<>();
+            loRS.beforeFirst();
+            while (loRS.next()) {
+                String lsStockId = loRS.getString("sStockIDx");
+                if (loExcludedStocks.contains(lsStockId)) {
+                    continue;
+                }
+
+                Map<String, String> loRow = new HashMap<>();
+                loRow.put("sStockIDx", lsStockId);
+                loRow.put("sBinNumbr", loRS.getString("sBinNumbr") != null ? loRS.getString("sBinNumbr") : "");
+                loRow.put("cClassify", loRS.getString("cClassify") != null ? loRS.getString("cClassify") : "");
+                loCandidates.add(loRow);
+            }
+
+            if (loCandidates.isEmpty()) {
+                poJSON.put("result", "error");
+                poJSON.put("message", "No eligible candidates found after period exclusions.");
+                return poJSON;
+            }
+
+            Random loRandom = new Random();
+            List<Map<String, String>> loSelected = new ArrayList<>();
+
+            switch (inclusionValue) {
+
+                case "AI": {
+                    // ── Include ALL period-eligible items, no stock filter ────────
+                    // AI = full list, only period-excluded stocks are filtered (done above in loCandidates)
+                    loSelected.addAll(loCandidates);
+
+                    if (loSelected.isEmpty()) {
+                        poJSON.put("result", "error");
+                        poJSON.put("message", "No items available for AI override.");
+                        return poJSON;
+                    }
+
+                    // Sort by sBinNumbr → cClassify for physical walkability
+                    loSelected.sort(Comparator
+                            .comparing((Map<String, String> r) -> r.get("sBinNumbr"))
+                            .thenComparing(r -> r.get("cClassify")));
+                    break;
+                }
+
+                case "BB": {
+                    // ─── Collect bins already represented in paDetail ────────────
+                    Set<String> loCurrentBins = new HashSet<>();
+                    for (Map<String, String> loRow : loCandidates) {
+                        if (loCurrentStocks.contains(loRow.get("sStockIDx"))) {
+                            loCurrentBins.add(loRow.get("sBinNumbr"));
+                        }
+                    }
+
+                    // ─── Group remaining candidates by sBinNumbr ─────────────────
+                    Map<String, List<Map<String, String>>> loBinGroups = new LinkedHashMap<>();
+                    for (Map<String, String> loRow : loCandidates) {
+                        if (!loCurrentBins.contains(loRow.get("sBinNumbr"))) {
+                            loBinGroups.computeIfAbsent(
+                                    loRow.get("sBinNumbr"), k -> new ArrayList<>()
+                            ).add(loRow);
+                        }
+                    }
+
+                    if (loBinGroups.isEmpty()) {
+                        poJSON.put("result", "error");
+                        poJSON.put("message", "No available bins left to override with.");
+                        return poJSON;
+                    }
+
+                    // ─── Pick exactly 1 random bin → 1 random item from it ───────
+                    List<String> loBinKeys = new ArrayList<>(loBinGroups.keySet());
+                    Collections.shuffle(loBinKeys, loRandom);
+                    String lsPickedBin = loBinKeys.get(0);
+
+                    List<Map<String, String>> loBinItems = new ArrayList<>(loBinGroups.get(lsPickedBin));
+                    Collections.shuffle(loBinItems, loRandom);
+                    loSelected.add(loBinItems.get(0)); // exactly 1 group → 1 item
+                    break;
+                }
+
+                case "C": {
+                    // ─── Collect classifications already represented in paDetail ──
+                    Set<String> loCurrentClasses = new HashSet<>();
+                    for (Map<String, String> loRow : loCandidates) {
+                        if (loCurrentStocks.contains(loRow.get("sStockIDx"))) {
+                            loCurrentClasses.add(loRow.get("cClassify"));
+                        }
+                    }
+
+                    // ─── Group remaining candidates by cClassify ──────────────────
+                    Map<String, List<Map<String, String>>> loClassGroups = new LinkedHashMap<>();
+                    for (Map<String, String> loRow : loCandidates) {
+                        if (!loCurrentClasses.contains(loRow.get("cClassify"))) {
+                            loClassGroups.computeIfAbsent(
+                                    loRow.get("cClassify"), k -> new ArrayList<>()
+                            ).add(loRow);
+                        }
+                    }
+
+                    if (loClassGroups.isEmpty()) {
+                        poJSON.put("result", "error");
+                        poJSON.put("message", "No available classifications left to override with.");
+                        return poJSON;
+                    }
+
+                    // ─── Pick exactly 1 random class → 1 random item from it ─────
+                    List<String> loClassKeys = new ArrayList<>(loClassGroups.keySet());
+                    Collections.shuffle(loClassKeys, loRandom);
+                    String lsPickedClass = loClassKeys.get(0);
+
+                    List<Map<String, String>> loClassItems = new ArrayList<>(loClassGroups.get(lsPickedClass));
+                    Collections.shuffle(loClassItems, loRandom);
+                    loSelected.add(loClassItems.get(0)); // exactly 1 group → 1 item
+                    break;
+                }
+
+                case "RX": {
+                    // ─── RX override: re-randomize from ALL eligible candidates ──────────
+                    if (loCandidates.isEmpty()) {
+                        poJSON.put("result", "error");
+                        poJSON.put("message", "No items available for random override.");
+                        return poJSON;
+                    }
+
+                    Collections.shuffle(loCandidates, loRandom);
+
+                    int lnRandomSize = 1 + loRandom.nextInt(loCandidates.size()); // range: [1, loCandidates.size()]
+                    loSelected = new ArrayList<>(loCandidates.subList(0, lnRandomSize));
+                    
+                    loSelected.sort(Comparator
+                            .comparing((Map<String, String> r) -> r.get("sBinNumbr"))
+                            .thenComparing(r -> r.get("cClassify")));
+                    break;
+                }
+
+                default: {
+                    poJSON.put("result", "error");
+                    poJSON.put("message", "Unknown inclusion type: " + inclusionValue);
+                    return poJSON;
+                }
+            }
+
+            if (loSelected.isEmpty()) {
+                poJSON.put("result", "error");
+                poJSON.put("message", "No replacement items found for the override.");
+                return poJSON;
+            }
+
+            paDetail = new ArrayList<>();
+
+            int lnCtr = 0;
+            for (Map<String, String> loRow : loSelected) {
+                String lsStockId = loRow.get("sStockIDx");
+                if (loExcludedStocks.contains(lsStockId)) {
+                    continue; // final guard
+                }
+                getDetail(lnCtr).setStockId(lsStockId);
+                lnCtr++;
+            }
+
+            if (lnCtr == 0) {
+                poJSON.put("result", "error");
+                poJSON.put("message", "All override candidates were already counted in the current period.");
+                return poJSON;
+            }
+
+            getMaster().setIncluded(inclusionValue);
+            poJSON = new JSONObject();
+            poJSON.put("result", "success");
+            poJSON.put("message", lnCtr + " item(s) successfully overridden.");
+            return poJSON;
+
+        } catch (SQLException | GuanzonException e) {
+            poJSON.put("result", "error");
+            poJSON.put("message", e.getMessage());
+            return poJSON;
+        }
+    }
+    //------------------------ATTACHMENT CODE HERE-------------------------------------------------------------------------------------
 
     public JSONObject loadAttachments()
             throws SQLException,
@@ -1988,6 +2418,18 @@ public class InventoryCount extends Transaction {
         return poJSON;
     }
 
+    @Override
+    public String getSourceCode() {
+        return SOURCE_CODE;
+    }
+
+    private JSONObject setJSON(String fsResult, String fsMessage) {
+        JSONObject loJSON = new JSONObject();
+        loJSON.put("result", fsResult);
+        loJSON.put("message", fsMessage);
+        return loJSON;
+    }
+
     public JSONObject addAttachment()
             throws SQLException,
             GuanzonException {
@@ -2000,22 +2442,18 @@ public class InventoryCount extends Transaction {
             if (!paAttachments.get(paAttachments.size() - 1).getModel().getTransactionNo().isEmpty()) {
                 paAttachments.add(TransactionAttachment());
             } else {
-                poJSON.put("result", "error");
-                poJSON.put("message", "Unable to add transaction attachment.");
+                poJSON = setJSON("error", "Unable to add transaction attachment.");
                 return poJSON;
             }
         }
-
-        poJSON.put("result", "success");
+        poJSON = setJSON("success", "success");
         return poJSON;
-
     }
 
     public JSONObject removeAttachment(int fnRow) throws GuanzonException, SQLException {
         poJSON = new JSONObject();
         if (getTransactionAttachmentCount() <= 0) {
-            poJSON.put("result", "error");
-            poJSON.put("message", "No transaction attachment to be removed.");
+            poJSON = setJSON("error", "No transaction attachment to be removed.");
             return poJSON;
         }
 
@@ -2088,5 +2526,93 @@ public class InventoryCount extends Transaction {
             System.out.println("No record loaded.");
         }
         return poJSON;
+    }
+
+    public JSONObject uploadCASAttachments(GRiderCAS instance, String access, int fnRow, String fsOriginalFileName) throws Exception {
+        poJSON = new JSONObject();
+        System.out.println("Uploading... : fsOriginalFileName : " + fsOriginalFileName);
+        System.out.println("New File Name... : " + paAttachments.get(fnRow).getModel().getFileName());
+        String hash;
+        String lsFile = paAttachments.get(fnRow).getModel().getFileName();
+
+        //check if new file is existing
+        File file = new File(paAttachments.get(fnRow).getModel().getImagePath() + "/" + lsFile);
+        if (!file.exists()) {
+            //check if original file is existing
+            lsFile = fsOriginalFileName;
+            file = new File(paAttachments.get(fnRow).getModel().getImagePath() + "/" + lsFile);
+            if (!file.exists()) {
+                poJSON = setJSON("error", "Cannot locate file in " + paAttachments.get(fnRow).getModel().getImagePath() + "/" + lsFile
+                        + ".\nContact system administrator for assistance.");
+                return poJSON;
+            }
+        }
+
+        //check if file hash is not empty
+        hash = paAttachments.get(fnRow).getModel().getMD5Hash();
+        if (paAttachments.get(fnRow).getModel().getMD5Hash() == null || "".equals(paAttachments.get(fnRow).getModel().getMD5Hash())) {
+            hash = MiscReplUtil.md5Hash(paAttachments.get(fnRow).getModel().getImagePath() + "/" + lsFile);
+        }
+
+        JSONObject result = WebFile.UploadFile(getAccessToken(access),
+                "0032",
+                "",
+                paAttachments.get(fnRow).getModel().getFileName(),
+                instance.getBranchCode(),
+                hash,
+                encodeFileToBase64Binary(file),
+                paAttachments.get(fnRow).getModel().getSourceCode(),
+                paAttachments.get(fnRow).getModel().getSourceNo(),
+                "");
+
+        if ("error".equalsIgnoreCase((String) result.get("result"))) {
+            System.out.println("Upload Error : " + result.toJSONString());
+            System.out.println("Upload Error : " + paAttachments.get(fnRow).getModel().getFileName());
+            poJSON = setJSON("error", "System error while uploading file " + paAttachments.get(fnRow).getModel().getFileName()
+                    + ".\nContact system administrator for assistance.");
+            return poJSON;
+        }
+        paAttachments.get(fnRow).getModel().setMD5Hash(hash);
+        paAttachments.get(fnRow).getModel().setSendStatus("1");
+        System.out.println("Upload Success : " + paAttachments.get(fnRow).getModel().getFileName());
+        poJSON.put("result", "success");
+        return poJSON;
+    }
+
+    private static String encodeFileToBase64Binary(File file) throws Exception {
+        FileInputStream fileInputStreamReader = new FileInputStream(file);
+        byte[] bytes = new byte[(int) file.length()];
+        fileInputStreamReader.read(bytes);
+        return new String(Base64.encodeBase64(bytes), "UTF-8");
+    }
+
+    private static JSONObject token = null;
+
+    private static String getAccessToken(String access) {
+        try {
+            JSONParser oParser = new JSONParser();
+            if (token == null) {
+                token = (JSONObject) oParser.parse(new FileReader(access));
+            }
+
+            Calendar current_date = Calendar.getInstance();
+            current_date.add(Calendar.MINUTE, -25);
+            Calendar date_created = Calendar.getInstance();
+            date_created.setTime(SQLUtil.toDate((String) token.get("created"), SQLUtil.FORMAT_TIMESTAMP));
+
+            //Check if token is still valid within the time frame
+            //Request new access token if not in the current period range
+            if (current_date.after(date_created)) {
+                String[] xargs = new String[]{(String) token.get("parent"), access};
+                RequestAccess.main(xargs);
+                token = (JSONObject) oParser.parse(new FileReader(access));
+            }
+
+            return (String) token.get("access_key");
+        } catch (IOException ex) {
+            return null;
+        } catch (ParseException ex) {
+            return null;
+        }
     }
 }
