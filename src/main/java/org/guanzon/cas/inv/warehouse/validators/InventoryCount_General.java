@@ -62,8 +62,8 @@ public class InventoryCount_General implements GValidator {
                     return validatePosted();
                 case InventoryCountStatus.CANCELLED:
                     return validateCancelled();
-                case InventoryCountStatus.VOID:
-                    return validateVoid();
+                case InventoryCountStatus.VERIFIED:
+                    return validateVerify();
                 default:
                     poJSON = new JSONObject();
                     poJSON.put("result", "error");
@@ -169,7 +169,6 @@ public class InventoryCount_General implements GValidator {
                 }
             }
         }
-       
 
         poJSON.put("result", "success");
         poJSON.put("isRequiredApproval", isRequiredApproval);
@@ -218,7 +217,7 @@ public class InventoryCount_General implements GValidator {
         return poJSON;
     }
 
-    private JSONObject validateVoid() throws SQLException {
+    private JSONObject validateVerify() throws SQLException {
         boolean isRequiredApproval = false;
         poJSON = new JSONObject();
 

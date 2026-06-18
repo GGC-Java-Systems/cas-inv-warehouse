@@ -360,6 +360,24 @@ public class InventoryCount extends Transaction {
         return updateTransaction();
     }
 
+    public JSONObject UpdateTransactionCount() {
+        poJSON = new JSONObject();
+
+        if (InventoryCountStatus.POSTED.equals((String) poMaster.getValue("cTranStat"))) {
+            poJSON.put("result", "error");
+            poJSON.put("message", "Transaction was already verfied.");
+            return poJSON;
+        }
+
+        if (InventoryCountStatus.CANCELLED.equals((String) poMaster.getValue("cTranStat"))) {
+            poJSON.put("result", "error");
+            poJSON.put("message", "Transaction was already cancelled.");
+            return poJSON;
+        }
+        getMaster().setCounterNo(getMaster().getCounterNo() + 1);
+        return updateTransaction();
+    }
+
     @Override
     protected JSONObject willSave() throws SQLException {
         poJSON = new JSONObject();
@@ -444,12 +462,6 @@ public class InventoryCount extends Transaction {
         if (InventoryCountStatus.CONFIRMED.equals((String) poMaster.getValue("cTranStat"))) {
             poJSON.put("result", "success");
 //            poJSON.put("message", "Transaction confirmed successfully.");
-            return poJSON;
-        }
-
-        if (InventoryCountStatus.VOID.equals((String) poMaster.getValue("cTranStat"))) {
-            poJSON.put("result", "error");
-            poJSON.put("message", "Transaction was already Void.");
             return poJSON;
         }
         if (InventoryCountStatus.CANCELLED.equals((String) poMaster.getValue("cTranStat"))) {
@@ -584,19 +596,14 @@ public class InventoryCount extends Transaction {
         return poJSON;
     }
 
-    public JSONObject PostTransaction() throws SQLException, GuanzonException, CloneNotSupportedException {
+    public JSONObject VerifyTransaction() throws SQLException, GuanzonException, CloneNotSupportedException {
         poJSON = new JSONObject();
 
-        if (getEditMode() != EditMode.UPDATE) {
-            poJSON.put("result", "error");
-            poJSON.put("message", "No transacton was loaded.");
-            return poJSON;
-        }
-        if (InventoryCountStatus.VOID.equals((String) poMaster.getValue("cTranStat"))) {
-            poJSON.put("result", "error");
-            poJSON.put("message", "Transaction was already Void.");
-            return poJSON;
-        }
+//        if (getEditMode() != EditMode.UPDATE) {
+//            poJSON.put("result", "error");
+//            poJSON.put("message", "No transacton was loaded.");
+//            return poJSON;
+//        }
         if (InventoryCountStatus.CANCELLED.equals((String) poMaster.getValue("cTranStat"))) {
             poJSON.put("result", "error");
             poJSON.put("message", "Transaction was already Cancelled.");
@@ -718,8 +725,10 @@ public class InventoryCount extends Transaction {
         }
         String lsCondition = "0";
 
-        InventoryTransaction loTrans = new InventoryTransaction(poGRider);
-        loTrans.DeliveryAcceptance((String) poMaster.getValue("sTransNox"), (Date) poMaster.getValue("dTransact"), false);
+        InventoryTransaction loTransDebit = new InventoryTransaction(poGRider);
+        InventoryTransaction loTransCredit = new InventoryTransaction(poGRider);
+        loTransCredit.InventoryCount((String) poMaster.getValue("sTransNox"), (Date) poMaster.getValue("dTransact"), false);
+        loTransDebit.InventoryCount((String) poMaster.getValue("sTransNox"), (Date) poMaster.getValue("dTransact"), true);
 
         for (Model loDetail : paDetail) {
             Model_Inventory_Count_Detail detail = (Model_Inventory_Count_Detail) loDetail;
@@ -731,7 +740,7 @@ public class InventoryCount extends Transaction {
             }
             if (getMaster().getCounterNo() == 1) {
                 if (detail.getStockId() != null) {
-                    loTrans.addDetail((String) poMaster.getValue("sIndstCdx"), detail.getStockId(),
+                    loTransCredit.addDetail((String) poMaster.getValue("sIndstCdx"), detail.getStockId(),
                             lsCondition,
                             detail.getActualCounter01().doubleValue(),
                             0,
@@ -739,7 +748,7 @@ public class InventoryCount extends Transaction {
                 }
             } else if (getMaster().getCounterNo() == 2) {
                 if (detail.getStockId() != null) {
-                    loTrans.addDetail((String) poMaster.getValue("sIndstCdx"), detail.getStockId(),
+                    loTransCredit.addDetail((String) poMaster.getValue("sIndstCdx"), detail.getStockId(),
                             lsCondition,
                             detail.getActualCounter02().doubleValue(),
                             0,
@@ -747,7 +756,7 @@ public class InventoryCount extends Transaction {
                 }
             } else if (getMaster().getCounterNo() == 3) {
                 if (detail.getStockId() != null) {
-                    loTrans.addDetail((String) poMaster.getValue("sIndstCdx"), detail.getStockId(),
+                    loTransCredit.addDetail((String) poMaster.getValue("sIndstCdx"), detail.getStockId(),
                             lsCondition,
                             detail.getActualCounter03().doubleValue(),
                             0,
@@ -758,7 +767,8 @@ public class InventoryCount extends Transaction {
 
         }
 
-        loTrans.saveTransaction();
+        loTransCredit.saveTransaction();
+        loTransDebit.saveTransaction();
 
         if (!"success".equals(
                 (String) poJSON.get("result"))) {
@@ -779,11 +789,48 @@ public class InventoryCount extends Transaction {
         poJSON.put(
                 "result", "success");
         if (lbConfirm) {
-            poJSON.put("message", "Transaction posted successfully.");
+            poJSON.put("message", "Transaction Verify successfully.");
         } else {
-            poJSON.put("message", "Transaction posting request submitted successfully.");
+            poJSON.put("message", "Transaction Verify request submitted successfully.");
         }
         return poJSON;
+    }
+
+    public JSONObject PostTransaction() throws SQLException, GuanzonException, CloneNotSupportedException {
+        poJSON = new JSONObject();
+
+        if (InventoryCountStatus.POSTED.equals((String) poMaster.getValue("cTranStat"))) {
+            poJSON.put("result", "success");
+            poJSON.put("message", "Transaction was already posted.");
+            return poJSON;
+        }
+
+        //validator
+        poJSON = isEntryOkay(InventoryCountStatus.POSTED);
+        if ("error".equals((String) poJSON.get("result"))) {
+            return poJSON;
+        }
+
+        poGRider.beginTrans("UPDATE STATUS", "ConfirmTransaction", SOURCE_CODE, getMaster().getTransactionNo());
+
+        poJSON = statusChange(poMaster.getTable(),
+                (String) poMaster.getValue("sTransNox"),
+                "ConfirmTransaction",
+                InventoryCountStatus.POSTED,
+                false, true);
+        if ("error".equals((String) poJSON.get("result"))) {
+            poGRider.rollbackTrans();
+            return poJSON;
+        }
+
+        poGRider.commitTrans();
+
+        JSONObject loJSON = new JSONObject();
+        loJSON.put("result", "success");
+        loJSON.put("message", "Transaction confirmed successfully.");
+
+        openTransaction(getMaster().getTransactionNo());
+        return loJSON;
     }
 
     public JSONObject CancelTransaction() throws SQLException, GuanzonException, CloneNotSupportedException {
@@ -792,11 +839,6 @@ public class InventoryCount extends Transaction {
         if (getEditMode() != EditMode.READY) {
             poJSON.put("result", "error");
             poJSON.put("message", "No transacton was loaded.");
-            return poJSON;
-        }
-        if (InventoryCountStatus.VOID.equals((String) poMaster.getValue("cTranStat"))) {
-            poJSON.put("result", "error");
-            poJSON.put("message", "Transaction was already Void.");
             return poJSON;
         }
         if (InventoryCountStatus.CANCELLED.equals((String) poMaster.getValue("cTranStat"))) {
@@ -922,65 +964,6 @@ public class InventoryCount extends Transaction {
         } else {
             poJSON.put("message", "Transaction cancellation request submitted successfully.");
         }
-        return poJSON;
-    }
-
-    public JSONObject VoidTransaction() throws SQLException, GuanzonException, CloneNotSupportedException {
-        poJSON = new JSONObject();
-
-        if (getEditMode() != EditMode.READY) {
-            poJSON.put("result", "error");
-            poJSON.put("message", "Invalid Edit Mode.");
-            return poJSON;
-        }
-
-        if (InventoryCountStatus.CONFIRMED.equals((String) poMaster.getValue("cTranStat"))) {
-            poJSON.put("result", "error");
-            poJSON.put("message", "Transaction was already confirmed.");
-            return poJSON;
-        }
-        if (InventoryCountStatus.CANCELLED.equals((String) poMaster.getValue("cTranStat"))) {
-            poJSON.put("result", "error");
-            poJSON.put("message", "Transaction was already cancelled.");
-            return poJSON;
-        }
-
-        if (InventoryCountStatus.VOID.equals((String) poMaster.getValue("cTranStat"))) {
-            poJSON.put("result", "error");
-            poJSON.put("message", "Transaction was already voided.");
-            return poJSON;
-        }
-
-        //validator
-        poJSON = isEntryOkay(InventoryCountStatus.VOID);
-        if ("error".equals((String) poJSON.get("result"))) {
-            return poJSON;
-        }
-
-        if (!pbWthParent) {
-            poGRider.beginTrans("UPDATE STATUS", "VoidTransaction", SOURCE_CODE, getMaster().getTransactionNo());
-        }
-        poJSON = statusChange(poMaster.getTable(),
-                (String) poMaster.getValue("sTransNox"),
-                "VoidTransaction",
-                InventoryCountStatus.VOID,
-                false, true);
-        if ("error".equals((String) poJSON.get("result"))) {
-            if (!pbWthParent) {
-                poGRider.rollbackTrans();
-            }
-            return poJSON;
-        }
-
-        if (!pbWthParent) {
-            poGRider.commitTrans();
-        }
-
-        openTransaction(getMaster().getTransactionNo());
-        poJSON = new JSONObject();
-        poJSON.put("result", "success");
-        poJSON.put("message", "Transaction voided successfully.");
-
         return poJSON;
     }
 
@@ -1274,11 +1257,6 @@ public class InventoryCount extends Transaction {
             return poJSON;
         }
 
-        if (InventoryCountStatus.VOID.equals((String) poMaster.getValue("cTranStat"))) {
-            poJSON.put("result", "error");
-            poJSON.put("message", "Transaction was already voided.");
-            return poJSON;
-        }
         poJSON = isEntryOkay(InventoryCountStatus.CONFIRMED);
         if ("error".equals((String) poJSON.get("result"))) {
             return poJSON;
@@ -1363,14 +1341,16 @@ public class InventoryCount extends Transaction {
         }
         );
         //add Parameter
-        poReportJasper.addParameter(
-                "sBranchNm", poGRider.getBranchName());
+        poReportJasper.addParameter("sReportNm", "Inventory Count AS OF - " + SQLUtil.dateFormat(getMaster().getTransactionDate(), SQLUtil.FORMAT_LONG_DATE));
+        poReportJasper.addParameter("sBranchNm", poGRider.getBranchName());
         poReportJasper.addParameter("sAddressx", poGRider.getAddress());
         poReportJasper.addParameter("sCompnyNm", poGRider.getClientName());
         poReportJasper.addParameter("sTransNox", getMaster().getTransactionNo());
         poReportJasper.addParameter("sRemarksx", getMaster().getRemarks() == null ? "" : getMaster().getRemarks());
         poReportJasper.addParameter("DatePrinted", SQLUtil.dateFormat(poGRider.getServerDate(), SQLUtil.FORMAT_TIMESTAMP));
         poReportJasper.addParameter("watermarkImagePath", poGRider.getReportPath() + "images\\blank.png");
+
+        poReportJasper.addParameter("sPrintdBy", poGRider.getClientName() == null ? "" : poGRider.getClientName());
 
         poReportJasper.setReportName("Inventory Count AS OF - " + SQLUtil.dateFormat(getMaster().getTransactionDate(), SQLUtil.FORMAT_LONG_DATE));
         poReportJasper.setJasperPath(InventoryCountPrint.getJasperReport(psIndustryCode));
@@ -1492,14 +1472,14 @@ public class InventoryCount extends Transaction {
                 case InventoryCountStatus.CONFIRMED:
                     crs.updateString("cRefrStat", "CONFIRMED");
                     break;
+                case InventoryCountStatus.VERIFIED:
+                    crs.updateString("cRefrStat", "VERIFIED");
+                    break;
                 case InventoryCountStatus.POSTED:
                     crs.updateString("cRefrStat", "POSTED");
                     break;
                 case InventoryCountStatus.CANCELLED:
                     crs.updateString("cRefrStat", "CANCELLED");
-                    break;
-                case InventoryCountStatus.VOID:
-                    crs.updateString("cRefrStat", "VOID");
                     break;
 
                 default:
@@ -1513,14 +1493,14 @@ public class InventoryCount extends Transaction {
                         case InventoryCountStatus.CONFIRMED:
                             crs.updateString("cRefrStat", "CONFIRMED");
                             break;
+                        case InventoryCountStatus.VERIFIED:
+                            crs.updateString("cRefrStat", "VERIFIED");
+                            break;
                         case InventoryCountStatus.POSTED:
                             crs.updateString("cRefrStat", "POSTED");
                             break;
                         case InventoryCountStatus.CANCELLED:
                             crs.updateString("cRefrStat", "CANCELLED");
-                            break;
-                        case InventoryCountStatus.VOID:
-                            crs.updateString("cRefrStat", "VOID");
                             break;
 
                     }
@@ -1957,6 +1937,12 @@ public class InventoryCount extends Transaction {
                 || getMaster().InventoryCountType().getIncluded() == null) {
             poJSON.put("result", "error");
             poJSON.put("message", "Please set the default rule first to continue.");
+            return poJSON;
+        }
+
+        if (getMaster().getCounterNo() > 1) {
+            poJSON.put("result", "error");
+            poJSON.put("message", "Unable to modify generated Items");
             return poJSON;
         }
 
