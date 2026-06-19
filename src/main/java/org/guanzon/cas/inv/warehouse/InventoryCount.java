@@ -47,6 +47,7 @@ import org.guanzon.appdriver.base.SQLUtil;
 import org.guanzon.appdriver.base.WebFile;
 import org.guanzon.appdriver.constant.EditMode;
 import org.guanzon.appdriver.constant.RecordStatus;
+import org.guanzon.appdriver.constant.TransactionStatus;
 import org.guanzon.appdriver.constant.UserRight;
 import org.guanzon.appdriver.iface.GValidator;
 import org.guanzon.appdriver.token.RequestAccess;
@@ -55,6 +56,7 @@ import org.guanzon.cas.client.services.ClientModels;
 import org.json.simple.JSONObject;
 import org.guanzon.cas.inv.warehouse.status.InventoryCountStatus;
 import org.guanzon.cas.inv.InventoryTransaction;
+import org.guanzon.cas.inv.warehouse.model.Model_Inventory_Adjustment;
 import org.guanzon.cas.inv.warehouse.model.Model_Inventory_Count_Detail;
 import org.guanzon.cas.inv.warehouse.model.Model_Inventory_Count_Master;
 import org.guanzon.cas.inv.warehouse.report.ReportUtil;
@@ -363,7 +365,7 @@ public class InventoryCount extends Transaction {
     public JSONObject UpdateTransactionCount() {
         poJSON = new JSONObject();
 
-        if (InventoryCountStatus.POSTED.equals((String) poMaster.getValue("cTranStat"))) {
+        if (InventoryCountStatus.VERIFIED.equals((String) poMaster.getValue("cTranStat"))) {
             poJSON.put("result", "error");
             poJSON.put("message", "Transaction was already verfied.");
             return poJSON;
@@ -388,22 +390,19 @@ public class InventoryCount extends Transaction {
         }
         int lnDetailCount = 0;
 
-        //assign values needed
+        for (int lnCtr = paDetail.size() - 1; lnCtr >= 0; lnCtr--) {
+            Model_Inventory_Count_Detail loDetail = (Model_Inventory_Count_Detail) paDetail.get(lnCtr);
+            if (loDetail.getStockId() == null || loDetail.getStockId().isEmpty()) {
+                paDetail.remove(lnCtr);
+            }
+        }
+
+        //assign values needed (forward pass, preserves original order)
         for (int lnCtr = 0; lnCtr < paDetail.size(); lnCtr++) {
             Model_Inventory_Count_Detail loDetail = (Model_Inventory_Count_Detail) paDetail.get(lnCtr);
-            if (loDetail.getStockId() == null) {
-                paDetail.remove(lnCtr);
-                continue;
-            }
-            if (!loDetail.getStockId().isEmpty()) {
-
-                lnDetailCount++;
-                loDetail.setTransactionNo(getMaster().getTransactionNo());
-                loDetail.setEntryNo(lnDetailCount);
-            } else {
-                paDetail.remove(lnCtr);
-
-            }
+            lnDetailCount++;
+            loDetail.setTransactionNo(getMaster().getTransactionNo());
+            loDetail.setEntryNo(lnDetailCount);
         }
 
         getMaster().setEntryNo(lnDetailCount);
@@ -569,14 +568,12 @@ public class InventoryCount extends Transaction {
 
         poJSON = statusChange(poMaster.getTable(), (String) poMaster.getValue("sTransNox"), "", lsStatus, !lbConfirm, true);
 
-        if (!"success".equals(
-                (String) poJSON.get("result"))) {
+        if (!"success".equals((String) poJSON.get("result"))) {
             poGRider.rollbackTrans();
             return poJSON;
         }
 
-        if (check
-                != null) {
+        if (check != null) {
             check.postAuth();
         }
 
@@ -588,11 +585,6 @@ public class InventoryCount extends Transaction {
         poJSON = new JSONObject();
 
         poJSON.put("result", "success");
-        if (lbConfirm) {
-            poJSON.put("message", "Transaction confirmed successfully.");
-        } else {
-            poJSON.put("message", "Transaction confirmation request submitted successfully.");
-        }
         return poJSON;
     }
 
@@ -604,26 +596,31 @@ public class InventoryCount extends Transaction {
 //            poJSON.put("message", "No transacton was loaded.");
 //            return poJSON;
 //        }
+        if (getMaster().getCounterNo() <= 0) {
+            poJSON.put("result", "error");
+            poJSON.put("message", "Transaction count is not started.");
+            return poJSON;
+        }
         if (InventoryCountStatus.CANCELLED.equals((String) poMaster.getValue("cTranStat"))) {
             poJSON.put("result", "error");
             poJSON.put("message", "Transaction was already Cancelled.");
             return poJSON;
         }
 
-        if (InventoryCountStatus.POSTED.equals((String) poMaster.getValue("cTranStat"))) {
+        if (InventoryCountStatus.VERIFIED.equals((String) poMaster.getValue("cTranStat"))) {
             poJSON.put("result", "error");
-            poJSON.put("message", "Transaction was already Posted.");
+            poJSON.put("message", "Transaction was already verified.");
             return poJSON;
         }
 
         //validator
-        poJSON = isEntryOkay(InventoryCountStatus.POSTED);
+        poJSON = isEntryOkay(InventoryCountStatus.VERIFIED);
         if ("error".equals((String) poJSON.get("result"))) {
             return poJSON;
         }
 
         boolean lbConfirm = true;
-        String lsStatus = InventoryCountStatus.POSTED;
+        String lsStatus = InventoryCountStatus.VERIFIED;
         MatrixAuthChecker check = null;
 
         if (!pbWthParent) {
@@ -710,73 +707,87 @@ public class InventoryCount extends Transaction {
 
         poJSON = statusChange(poMaster.getTable(), (String) poMaster.getValue("sTransNox"), "", lsStatus, !lbConfirm, true);
 
-        if (!"success".equals(
-                (String) poJSON.get("result"))) {
+        if (!"success".equals((String) poJSON.get("result"))) {
             poGRider.rollbackTrans();
             return poJSON;
         }
-
         Model_Inventory_Count_Master loMaster = (Model_Inventory_Count_Master) this.poMaster;
         loMaster.updateRecord();
         loMaster.setTransactionStatus(lsStatus);
+
         if (!"success".equals((String) loMaster.saveRecord().get("result"))) {
             poGRider.rollbackTrans();
             return poJSON;
         }
-        String lsCondition = "0";
-
-        InventoryTransaction loTransDebit = new InventoryTransaction(poGRider);
-        InventoryTransaction loTransCredit = new InventoryTransaction(poGRider);
-        loTransCredit.InventoryCount((String) poMaster.getValue("sTransNox"), (Date) poMaster.getValue("dTransact"), false);
-        loTransDebit.InventoryCount((String) poMaster.getValue("sTransNox"), (Date) poMaster.getValue("dTransact"), true);
-
-        for (Model loDetail : paDetail) {
-            Model_Inventory_Count_Detail detail = (Model_Inventory_Count_Detail) loDetail;
-            detail.updateRecord();
-
-            if (!"success".equals((String) detail.saveRecord().get("result"))) {
-                poGRider.rollbackTrans();
+        if (getMaster().InventoryCountType().isAllowBalanceForward()) {
+            //entry of adjustment
+            int lnCounterNo = getMaster().getCounterNo();
+            String lsAdjustmentTransactionNo = MiscUtil.getNextCode("Inventory_Adjustment", "sTransNox", true, poGRider.getGConnection().getConnection(), poGRider.getBranchCode());
+            if (lsAdjustmentTransactionNo == null || lsAdjustmentTransactionNo.isEmpty()) {
+                poJSON.put("result", "error");
+                poJSON.put("message", "Unable to get Adjustment Transaction No.");
                 return poJSON;
+
             }
-            if (getMaster().getCounterNo() == 1) {
-                if (detail.getStockId() != null) {
-                    loTransCredit.addDetail((String) poMaster.getValue("sIndstCdx"), detail.getStockId(),
-                            lsCondition,
-                            detail.getActualCounter01().doubleValue(),
-                            0,
-                            detail.Inventory().getCost().doubleValue());
-                }
-            } else if (getMaster().getCounterNo() == 2) {
-                if (detail.getStockId() != null) {
-                    loTransCredit.addDetail((String) poMaster.getValue("sIndstCdx"), detail.getStockId(),
-                            lsCondition,
-                            detail.getActualCounter02().doubleValue(),
-                            0,
-                            detail.Inventory().getCost().doubleValue());
-                }
-            } else if (getMaster().getCounterNo() == 3) {
-                if (detail.getStockId() != null) {
-                    loTransCredit.addDetail((String) poMaster.getValue("sIndstCdx"), detail.getStockId(),
-                            lsCondition,
-                            detail.getActualCounter03().doubleValue(),
-                            0,
-                            detail.Inventory().getCost().doubleValue());
+            for (Model loDetail : paDetail) {
+                Model_Inventory_Count_Detail detail = (Model_Inventory_Count_Detail) loDetail;
+//                
+//                detail.updateRecord();
+//                JSONObject loDetailResult = detail.saveRecord();
+//                if (!"success".equals((String) loDetailResult.get("result"))) {
+//                    poGRider.rollbackTrans();
+//                    return loDetailResult;
+//                }
+
+                if (detail.getStockId() == null) {
+                    continue;
                 }
 
+                //determine actual count based on which counter verify this transaction
+                Double lnActualCount = null;
+                if (lnCounterNo == 1) {
+                    lnActualCount = detail.getActualCounter01();
+                } else if (lnCounterNo == 2) {
+                    lnActualCount = detail.getActualCounter02();
+                } else if (lnCounterNo == 3) {
+                    lnActualCount = detail.getActualCounter03();
+                }
+
+                if (lnActualCount == null) {
+                    continue;
+                }
+
+                double lnQtyAdjustment = detail.getQuantityOnHand() - lnActualCount;
+
+                //no variance, nothing to adjust
+                if (Math.abs(lnQtyAdjustment) < 0.0000001) {
+                    continue;
+                }
+
+                //initialize adjustment 
+                Model_Inventory_Adjustment loAdjustment = new InvWarehouseModels(poGRider).InventoryAdjustment();
+                loAdjustment.newRecord();
+                loAdjustment.setTransactionNo(lsAdjustmentTransactionNo);
+                loAdjustment.setSourceCode(SOURCE_CODE);
+                loAdjustment.setSourceNo(getMaster().getTransactionNo());
+                loAdjustment.setPartsID(detail.getStockId());
+                if (lnQtyAdjustment < 0) {
+                    //actual count > system qty on hand -> extra stock found -> QtyIn (positive)
+                    loAdjustment.setQtyIn(-lnQtyAdjustment);
+                } else {
+                    //system qty on hand > actual count -> stock missing -> QtyOut (positive)
+                    loAdjustment.setQtyOut(lnQtyAdjustment);
+                }
+
+                JSONObject loAdjustmentResult = loAdjustment.saveRecord();
+                if (!"success".equals((String) loAdjustmentResult.get("result"))) {
+                    poGRider.rollbackTrans();
+                    return loAdjustmentResult;
+                }
             }
 
         }
-
-        loTransCredit.saveTransaction();
-        loTransDebit.saveTransaction();
-
-        if (!"success".equals(
-                (String) poJSON.get("result"))) {
-            poGRider.rollbackTrans();
-            return poJSON;
-        }
-        if (check
-                != null) {
+        if (check != null) {
             check.postAuth();
         }
         if (!pbWthParent) {
@@ -786,13 +797,7 @@ public class InventoryCount extends Transaction {
         openTransaction(getMaster().getTransactionNo());
         poJSON = new JSONObject();
 
-        poJSON.put(
-                "result", "success");
-        if (lbConfirm) {
-            poJSON.put("message", "Transaction Verify successfully.");
-        } else {
-            poJSON.put("message", "Transaction Verify request submitted successfully.");
-        }
+        poJSON.put("result", "success");
         return poJSON;
     }
 
@@ -811,7 +816,7 @@ public class InventoryCount extends Transaction {
             return poJSON;
         }
 
-        poGRider.beginTrans("UPDATE STATUS", "ConfirmTransaction", SOURCE_CODE, getMaster().getTransactionNo());
+        poGRider.beginTrans("UPDATE STATUS", "Post Transaction", SOURCE_CODE, getMaster().getTransactionNo());
 
         poJSON = statusChange(poMaster.getTable(),
                 (String) poMaster.getValue("sTransNox"),
@@ -823,11 +828,74 @@ public class InventoryCount extends Transaction {
             return poJSON;
         }
 
+        String lsSQL = " SELECT "
+                + " a.sTransNox"
+                + ", a.dTransact"
+                + ", a.sPartsIDx"
+                + ", a.sSourceNo"
+                + ", a.sSourceCd "
+                + " FROM Inventory_Adjustment a ";
+        lsSQL = MiscUtil.addCondition(lsSQL, " a.sSourceNo =  " + SQLUtil.toSQL(getMaster().getTransactionNo()));
+        lsSQL = MiscUtil.addCondition(lsSQL, " a.sSourceCd =  " + SQLUtil.toSQL(SOURCE_CODE));
+        System.out.println("Execute SQL : " + lsSQL);
+        ResultSet loRS = poGRider.executeQuery(lsSQL);
+        try {
+            if (MiscUtil.RecordCount(loRS) > 0L) {
+                InventoryTransaction loTransDebit = new InventoryTransaction(poGRider);
+                InventoryTransaction loTransCredit = new InventoryTransaction(poGRider);  //generate ledger
+                if (loRS.next()) {
+                    loTransCredit.InventoryAdjustment(loRS.getString("sTransNox"), (Date) loRS.getDate("dTransact"), false);
+                    loTransDebit.InventoryAdjustment(loRS.getString("sTransNox"), (Date) loRS.getDate("dTransact"), true);
+                }
+                loRS.beforeFirst();
+                while (loRS.next()) {
+                    Model_Inventory_Adjustment loAdjustment = new InvWarehouseModels(poGRider).InventoryAdjustment();
+                    poJSON = loAdjustment.openRecord(loRS.getString("sTransNox"),
+                            loRS.getString("sPartsIDx"),
+                            loRS.getString("sSourceNo"),
+                            loRS.getString("sSourceCd"));
+
+                    if ("error".equals((String) poJSON.get("result"))) {
+                        poGRider.rollbackTrans();
+                        return poJSON;
+                    }
+
+                    if (loAdjustment.getQtyIn() > 0) {
+                        loTransCredit.addDetail(poGRider.getIndustry(), loAdjustment.getPartsID(),
+                                "0",
+                                loAdjustment.getQtyIn().doubleValue(),
+                                0,
+                                loAdjustment.Inventory().getCost().doubleValue());
+                    } else {
+                        loTransDebit.addDetail(poGRider.getIndustry(), loAdjustment.getPartsID(),
+                                "0",
+                                loAdjustment.getQtyOut().doubleValue(),
+                                0,
+                                loAdjustment.Inventory().getCost().doubleValue());
+                    }
+
+                    //set into close
+                    loAdjustment.setTransactionStatus(TransactionStatus.STATE_CLOSED);
+                    loAdjustment.updateRecord();
+                    loAdjustment.saveRecord();
+                }
+
+                loTransCredit.saveTransaction();
+                loTransDebit.saveTransaction();
+            }
+            MiscUtil.close(loRS);
+        } catch (SQLException | GuanzonException e) {
+            poJSON.put("result", "error");
+            poJSON.put("message", e.getMessage());
+            poGRider.rollbackTrans();
+            return poJSON;
+        }
+
         poGRider.commitTrans();
 
         JSONObject loJSON = new JSONObject();
         loJSON.put("result", "success");
-        loJSON.put("message", "Transaction confirmed successfully.");
+        loJSON.put("message", "Transaction posted successfully.");
 
         openTransaction(getMaster().getTransactionNo());
         return loJSON;
@@ -1637,6 +1705,7 @@ public class InventoryCount extends Transaction {
                 + "   a.sStockIDx"
                 + " , a.sBranchCd"
                 + " , b.sIndstCdx"
+                + " , a.nQtyOnHnd"
                 + " , a.sWHouseID"
                 + " , a.sLocatnID"
                 + " , a.sBinNumbr" // grouping key for BB case
@@ -1678,6 +1747,7 @@ public class InventoryCount extends Transaction {
             String lsStockId = loRS.getString("sStockIDx");
             String lsBinNumbr = loRS.getString("sBinNumbr"); // b.sBinNumbr
             String lsClassify = loRS.getString("cClassify"); // b.cClassify
+            String lsQtyOnHnd = String.valueOf(loRS.getObject("nQtyOnHnd")); // 
 
             // Skip already-counted items at source
             if (loExcludedStocks.contains(lsStockId)) {
@@ -1688,6 +1758,7 @@ public class InventoryCount extends Transaction {
             loRow.put("sStockIDx", lsStockId);
             loRow.put("sBinNumbr", lsBinNumbr != null ? lsBinNumbr : "");
             loRow.put("cClassify", lsClassify != null ? lsClassify : "");
+            loRow.put("nQtyOnHnd", lsQtyOnHnd != null ? lsQtyOnHnd : "0.0");
             loCandidates.add(loRow);
         }
 
@@ -1845,12 +1916,13 @@ public class InventoryCount extends Transaction {
         for (Map<String, String> loRow : loSelected) {
             String lsStockId = loRow.get("sStockIDx");
 
-            // Final guard: skip if stock was already counted in the period
+            Double lnQtyOnHand = Double.valueOf(loRow.get("nQtyOnHnd"));
             if (loExcludedStocks.contains(lsStockId)) {
                 continue;
             }
 
             getDetail(lnCtr).setStockId(lsStockId);
+            getDetail(lnCtr).setQuantityOnHand(lnQtyOnHand);
             lnCtr++;
         }
 
@@ -2020,6 +2092,7 @@ public class InventoryCount extends Transaction {
                     + " , b.sIndstCdx"
                     + " , a.sWHouseID"
                     + " , a.sLocatnID"
+                    + " , a.nQtyOnHnd"
                     + " , a.sBinNumbr"
                     + " , a.cClassify"
                     + " FROM Inv_Master a"
@@ -2061,6 +2134,8 @@ public class InventoryCount extends Transaction {
                 loRow.put("sStockIDx", lsStockId);
                 loRow.put("sBinNumbr", loRS.getString("sBinNumbr") != null ? loRS.getString("sBinNumbr") : "");
                 loRow.put("cClassify", loRS.getString("cClassify") != null ? loRS.getString("cClassify") : "");
+                Object loQtyOnHnd = loRS.getObject("nQtyOnHnd");
+                loRow.put("nQtyOnHnd", loQtyOnHnd != null ? String.valueOf(loQtyOnHnd) : "0.0");
                 loCandidates.add(loRow);
             }
 
@@ -2206,10 +2281,13 @@ public class InventoryCount extends Transaction {
             int lnCtr = 0;
             for (Map<String, String> loRow : loSelected) {
                 String lsStockId = loRow.get("sStockIDx");
+                Double lnQtyOnHand = Double.valueOf(loRow.get("nQtyOnHnd"));
                 if (loExcludedStocks.contains(lsStockId)) {
-                    continue; // final guard
+                    continue;
                 }
+
                 getDetail(lnCtr + 1).setStockId(lsStockId);
+                getDetail(lnCtr + 1).setQuantityOnHand(lnQtyOnHand);
                 lnCtr++;
             }
 
