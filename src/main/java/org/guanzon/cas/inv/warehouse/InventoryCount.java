@@ -1089,9 +1089,12 @@ public class InventoryCount extends Transaction {
         }
     }
 
-    public JSONObject searchTransactionPosting(String value, boolean byCode, boolean byExact) {
+    public JSONObject searchTransactionOpen(String value, boolean byCode, boolean byExact) {
         try {
             String lsSQL = SQL_BROWSE;
+
+            lsSQL = MiscUtil.addCondition(lsSQL, "a.sBranchCd = " + SQLUtil.toSQL(poGRider.getBranchCode()));
+
             String lsCondition = "";
             if (psTranStat != null) {
                 if (this.psTranStat.length() > 1) {
@@ -1104,32 +1107,25 @@ public class InventoryCount extends Transaction {
                 }
                 lsSQL = MiscUtil.addCondition(lsSQL, lsCondition);
             }
-            lsSQL = MiscUtil.addCondition(lsSQL, "a.sDestinat = " + SQLUtil.toSQL(poGRider.getBranchCode()));
-
             if (!psCategorCD.isEmpty()) {
                 lsSQL = MiscUtil.addCondition(lsSQL, " a.sCategrCd = " + SQLUtil.toSQL(psCategorCD));
             }
+            lsSQL = MiscUtil.addCondition(lsSQL, " a.nCounterx = " + SQLUtil.toSQL("0"));
             System.out.println("Search Query is = " + lsSQL);
             poJSON = ShowDialogFX.Search(poGRider,
                     lsSQL,
                     value,
-                    "Transaction No»Branch Name»Date",
-                    "sTransNox»xBranchNm»dTransact",
-                    "a.sTransNox»d.sBranchNm»a.dTransact",
+                    "Transaction No»Date»Count Type",
+                    "sTransNox»dTransact»sDescript",
+                    "a.sTransNox»a.dTransact»b.sDescript",
                     byExact ? (byCode ? 0 : 1) : 2);
 
             if (poJSON != null) {
                 if ("error".equals((String) poJSON.get("result"))) {
                     return poJSON;
                 }
-                poJSON = openTransaction((String) poJSON.get("sTransNox"));
+                return OpenTransaction((String) poJSON.get("sTransNox"));
 
-                if (!"error".equals((String) poJSON.get("result"))) {
-                    return updateTransaction();
-                }
-                return poJSON;
-//            } else if ("error".equals((String) poJSON.get("result"))) {
-//                return poJSON;
             } else {
                 poJSON = new JSONObject();
                 poJSON.put("result", "error");
@@ -1147,132 +1143,130 @@ public class InventoryCount extends Transaction {
         }
     }
 
-    public JSONObject loadTransactionList(String value, String column)
-            throws SQLException, GuanzonException, CloneNotSupportedException {
-
-//        if (psIndustryCode.isEmpty()) {
+//    public JSONObject loadTransactionList(String value, String column)
+//            throws SQLException, GuanzonException, CloneNotSupportedException {
+//
+////        if (psIndustryCode.isEmpty()) {
+////            poJSON.put("result", "error");
+////            poJSON.put("message", "I is not set");
+////            return poJSON;
+////        }
+//        paMaster.clear();
+//        initSQL();
+//        String lsSQL = SQL_BROWSE;
+//        String lsCondition = "";
+//        if (psTranStat != null) {
+//            if (this.psTranStat.length() > 1) {
+//                for (int lnCtr = 0; lnCtr <= this.psTranStat.length() - 1; lnCtr++) {
+//                    lsCondition = lsCondition + ", " + SQLUtil.toSQL(Character.toString(this.psTranStat.charAt(lnCtr)));
+//                }
+//                lsCondition = "a.cTranStat IN (" + lsCondition.substring(2) + ")";
+//            } else {
+//                lsCondition = "a.cTranStat = " + SQLUtil.toSQL(this.psTranStat);
+//            }
+//            lsSQL = MiscUtil.addCondition(lsSQL, lsCondition);
+//        }
+//
+//        if (value != null && !value.isEmpty()) {
+//            //a.sTransNox/e.sBranchNm #Posting/d.sBranchNm #Confirmation
+//            lsSQL = MiscUtil.addCondition(lsSQL, column + " LIKE " + SQLUtil.toSQL(value + "%"));
+//        }
+//
+//        if (!psIndustryCode.isEmpty()) {
+//            lsSQL = MiscUtil.addCondition(lsSQL, "a.sIndstCdx = " + SQLUtil.toSQL(psIndustryCode));
+//        }
+//        if (!psCategorCD.isEmpty()) {
+//            lsSQL = MiscUtil.addCondition(lsSQL, "a.sCategrCd = " + SQLUtil.toSQL(psCategorCD));
+//        }
+//
+//        lsSQL = MiscUtil.addCondition(lsSQL, "a.sBranchCd = " + SQLUtil.toSQL(poGRider.getBranchCode()));
+//        ResultSet loRS = poGRider.executeQuery(lsSQL);
+//        System.out.println("Load Transaction list query is " + lsSQL);
+//
+//        if (MiscUtil.RecordCount(loRS)
+//                <= 0) {
 //            poJSON.put("result", "error");
-//            poJSON.put("message", "I is not set");
+//            poJSON.put("message", "No record found.");
 //            return poJSON;
 //        }
-        paMaster.clear();
-        initSQL();
-        String lsSQL = SQL_BROWSE;
-        String lsCondition = "";
-        if (psTranStat != null) {
-            if (this.psTranStat.length() > 1) {
-                for (int lnCtr = 0; lnCtr <= this.psTranStat.length() - 1; lnCtr++) {
-                    lsCondition = lsCondition + ", " + SQLUtil.toSQL(Character.toString(this.psTranStat.charAt(lnCtr)));
-                }
-                lsCondition = "a.cTranStat IN (" + lsCondition.substring(2) + ")";
-            } else {
-                lsCondition = "a.cTranStat = " + SQLUtil.toSQL(this.psTranStat);
-            }
-            lsSQL = MiscUtil.addCondition(lsSQL, lsCondition);
-        }
-
-        if (value != null && !value.isEmpty()) {
-            //a.sTransNox/e.sBranchNm #Posting/d.sBranchNm #Confirmation
-            lsSQL = MiscUtil.addCondition(lsSQL, column + " LIKE " + SQLUtil.toSQL(value + "%"));
-        }
-
-        if (!psIndustryCode.isEmpty()) {
-            lsSQL = MiscUtil.addCondition(lsSQL, "a.sIndstCdx = " + SQLUtil.toSQL(psIndustryCode));
-        }
-        if (!psCategorCD.isEmpty()) {
-            lsSQL = MiscUtil.addCondition(lsSQL, "a.sCategrCd = " + SQLUtil.toSQL(psCategorCD));
-        }
-
-        lsSQL = MiscUtil.addCondition(lsSQL, "a.sBranchCd = " + SQLUtil.toSQL(poGRider.getBranchCode()));
-        ResultSet loRS = poGRider.executeQuery(lsSQL);
-        System.out.println("Load Transaction list query is " + lsSQL);
-
-        if (MiscUtil.RecordCount(loRS)
-                <= 0) {
-            poJSON.put("result", "error");
-            poJSON.put("message", "No record found.");
-            return poJSON;
-        }
-
-        while (loRS.next()) {
-            Model_Inventory_Count_Master loInventoryCount = new InvWarehouseModels(poGRider).InventoryCountMaster();
-            poJSON = loInventoryCount.openRecord(loRS.getString("sTransNox"));
-
-            if ("success".equals((String) poJSON.get("result"))) {
-                paMaster.add((Model) loInventoryCount);
-            } else {
-                return poJSON;
-            }
-        }
-
-        poJSON = new JSONObject();
-        poJSON.put("result", "success");
-        return poJSON;
-    }
-
-    public JSONObject loadTransactionListPosting(String value, String column)
-            throws SQLException, GuanzonException, CloneNotSupportedException {
-
-//        if (psIndustryCode.isEmpty()) {
+//
+//        while (loRS.next()) {
+//            Model_Inventory_Count_Master loInventoryCount = new InvWarehouseModels(poGRider).InventoryCountMaster();
+//            poJSON = loInventoryCount.openRecord(loRS.getString("sTransNox"));
+//
+//            if ("success".equals((String) poJSON.get("result"))) {
+//                paMaster.add((Model) loInventoryCount);
+//            } else {
+//                return poJSON;
+//            }
+//        }
+//
+//        poJSON = new JSONObject();
+//        poJSON.put("result", "success");
+//        return poJSON;
+//    }
+//    public JSONObject loadTransactionListPosting(String value, String column)
+//            throws SQLException, GuanzonException, CloneNotSupportedException {
+//
+////        if (psIndustryCode.isEmpty()) {
+////            poJSON.put("result", "error");
+////            poJSON.put("message", "I is not set");
+////            return poJSON;
+////        }
+//        paMaster.clear();
+//        initSQL();
+//        String lsSQL = SQL_BROWSE;
+//
+//        if (value != null && !value.isEmpty()) {
+//            //sTransNox/dTransact/dSchedule
+//            lsSQL = MiscUtil.addCondition(lsSQL, column + " LIKE " + SQLUtil.toSQL(value + "%"));
+//        }
+//        String lsCondition = "";
+//        if (psTranStat != null) {
+//            if (this.psTranStat.length() > 1) {
+//                for (int lnCtr = 0; lnCtr <= this.psTranStat.length() - 1; lnCtr++) {
+//                    lsCondition = lsCondition + ", " + SQLUtil.toSQL(Character.toString(this.psTranStat.charAt(lnCtr)));
+//                }
+//                lsCondition = "a.cTranStat IN (" + lsCondition.substring(2) + ")";
+//            } else {
+//                lsCondition = "a.cTranStat = " + SQLUtil.toSQL(this.psTranStat);
+//            }
+//            lsSQL = MiscUtil.addCondition(lsSQL, lsCondition);
+//        }
+//
+//        if (!psIndustryCode.isEmpty()) {
+//            lsSQL = MiscUtil.addCondition(lsSQL, "a.sIndstCdx = " + SQLUtil.toSQL(psIndustryCode));
+//        }
+//        if (!psCategorCD.isEmpty()) {
+//            lsSQL = MiscUtil.addCondition(lsSQL, "a.sCategrCd = " + SQLUtil.toSQL(psCategorCD));
+//        }
+//
+//        lsSQL = MiscUtil.addCondition(lsSQL, "a.sDestinat = " + SQLUtil.toSQL(poGRider.getBranchCode()));
+//        ResultSet loRS = poGRider.executeQuery(lsSQL);
+//        System.out.println("Load Transaction list query is " + lsSQL);
+//
+//        if (MiscUtil.RecordCount(loRS)
+//                <= 0) {
 //            poJSON.put("result", "error");
-//            poJSON.put("message", "I is not set");
+//            poJSON.put("message", "No record found.");
 //            return poJSON;
 //        }
-        paMaster.clear();
-        initSQL();
-        String lsSQL = SQL_BROWSE;
-
-        if (value != null && !value.isEmpty()) {
-            //sTransNox/dTransact/dSchedule
-            lsSQL = MiscUtil.addCondition(lsSQL, column + " LIKE " + SQLUtil.toSQL(value + "%"));
-        }
-        String lsCondition = "";
-        if (psTranStat != null) {
-            if (this.psTranStat.length() > 1) {
-                for (int lnCtr = 0; lnCtr <= this.psTranStat.length() - 1; lnCtr++) {
-                    lsCondition = lsCondition + ", " + SQLUtil.toSQL(Character.toString(this.psTranStat.charAt(lnCtr)));
-                }
-                lsCondition = "a.cTranStat IN (" + lsCondition.substring(2) + ")";
-            } else {
-                lsCondition = "a.cTranStat = " + SQLUtil.toSQL(this.psTranStat);
-            }
-            lsSQL = MiscUtil.addCondition(lsSQL, lsCondition);
-        }
-
-        if (!psIndustryCode.isEmpty()) {
-            lsSQL = MiscUtil.addCondition(lsSQL, "a.sIndstCdx = " + SQLUtil.toSQL(psIndustryCode));
-        }
-        if (!psCategorCD.isEmpty()) {
-            lsSQL = MiscUtil.addCondition(lsSQL, "a.sCategrCd = " + SQLUtil.toSQL(psCategorCD));
-        }
-
-        lsSQL = MiscUtil.addCondition(lsSQL, "a.sDestinat = " + SQLUtil.toSQL(poGRider.getBranchCode()));
-        ResultSet loRS = poGRider.executeQuery(lsSQL);
-        System.out.println("Load Transaction list query is " + lsSQL);
-
-        if (MiscUtil.RecordCount(loRS)
-                <= 0) {
-            poJSON.put("result", "error");
-            poJSON.put("message", "No record found.");
-            return poJSON;
-        }
-
-        while (loRS.next()) {
-            Model_Inventory_Count_Master loInventoryCount = new InvWarehouseModels(poGRider).InventoryCountMaster();
-            poJSON = loInventoryCount.openRecord(loRS.getString("sTransNox"));
-
-            if ("success".equals((String) poJSON.get("result"))) {
-                paMaster.add((Model) loInventoryCount);
-            } else {
-                return poJSON;
-            }
-        }
-
-        poJSON = new JSONObject();
-        poJSON.put("result", "success");
-        return poJSON;
-    }
-
+//
+//        while (loRS.next()) {
+//            Model_Inventory_Count_Master loInventoryCount = new InvWarehouseModels(poGRider).InventoryCountMaster();
+//            poJSON = loInventoryCount.openRecord(loRS.getString("sTransNox"));
+//
+//            if ("success".equals((String) poJSON.get("result"))) {
+//                paMaster.add((Model) loInventoryCount);
+//            } else {
+//                return poJSON;
+//            }
+//        }
+//
+//        poJSON = new JSONObject();
+//        poJSON.put("result", "success");
+//        return poJSON;
+//    }
     private String getCategory() {
         String lsCategory;
         switch (psIndustryCode) {
@@ -1717,9 +1711,9 @@ public class InventoryCount extends Transaction {
         if (!psIndustryCode.isEmpty()) {
             lsSQL += " AND a.sIndstCdx = " + SQLUtil.toSQL(psIndustryCode);
         }
-//        if (!psCategorCD.isEmpty()) {
-//            lsSQL += " AND b.sCategrCd = " + SQLUtil.toSQL(psCategorCD);
-//        }
+        if (!psCategorCD.isEmpty()) {
+            lsSQL += " AND b.sCategCd1 = " + SQLUtil.toSQL(psCategorCD);
+        }
 
         // Pre-filter at DB level: only fetch rows relevant to the inclusion type
         switch (lsIncluded) {
@@ -2103,6 +2097,10 @@ public class InventoryCount extends Transaction {
                 lsSQL += " AND b.sIndstCdx = " + SQLUtil.toSQL(psIndustryCode);
             }
 
+            if (!psCategorCD.isEmpty()) {
+                lsSQL += " AND b.sCategrCd = " + SQLUtil.toSQL(psCategorCD);
+            }
+
             // Pre-filter at DB level for BB and C
             switch (inclusionValue) {
                 case "BB":
@@ -2308,6 +2306,46 @@ public class InventoryCount extends Transaction {
             poJSON.put("message", e.getMessage());
             return poJSON;
         }
+    }
+
+    public JSONObject isOfficerEmployee() throws SQLException {
+        poJSON = new JSONObject();
+        String userID = poGRider.getEmployeeNo();
+
+        //check by user level
+        if (poGRider.getUserLevel() >= UserRight.AUDIT) {
+            poJSON.put("result", "success");
+        }
+        if (userID == null || userID.trim().isEmpty()) {
+            poJSON.put("result", "error");
+            poJSON.put("message", "Invalid User ID. Please inform MIS Dept. for Account configuration.");
+            return poJSON;
+        }
+
+        String lsSQL = "SELECT"
+                + " a.sClientID"
+                + ", a.sCompnyNm"
+                + ", b.sBranchCd"
+                + ", b.cEmpRankx"
+                + ", c.cMainOffc"
+                + " FROM Client_Master a"
+                + "    LEFT JOIN Employee_Master001 b ON a.sClientID = b.sEmployID"
+                + "    LEFT JOIN Branch c ON b.sBranchCd = c.sBranchCd"
+                + "           WHERE (cMainOffc = '1' AND b.cEmpRankx BETWEEN '01' AND '06' "
+                + "                     AND b.sEmployID = " + SQLUtil.toSQL(userID) + ")"
+                + "             OR  (b.sDeptIDxx IN ('034','026','A008')"
+                + "             AND b.sEmployID = " + SQLUtil.toSQL(userID) + ")";
+
+        System.out.println("Employee eligibility: " + lsSQL);
+        ResultSet loRS = poGRider.executeQuery(lsSQL);
+        if (MiscUtil.RecordCount(loRS) <= 0) {
+            poJSON.put("result", "error");
+            poJSON.put("message", "User is not authorized to use this system.");
+            return poJSON;
+        }
+
+        poJSON.put("result", "success");
+        return poJSON;
     }
     //------------------------ATTACHMENT CODE HERE-------------------------------------------------------------------------------------
 
