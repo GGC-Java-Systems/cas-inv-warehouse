@@ -1436,8 +1436,8 @@ public class InventoryCount extends Transaction {
         //        poReportJasper.setJasperPrint(report0Print);
         poReportJasper.isAlwaysTop(false);
         poReportJasper.isWithUI(true);
-        poReportJasper.isWithExport(false);
-        poReportJasper.isWithExportPDF(false);
+        poReportJasper.isWithExport(true);
+        poReportJasper.isWithExportPDF(true);
         poReportJasper.willExport(true);
         return poReportJasper.generateReport();
 

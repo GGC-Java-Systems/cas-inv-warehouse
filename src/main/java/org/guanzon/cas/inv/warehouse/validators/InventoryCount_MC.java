@@ -1,14 +1,12 @@
 package org.guanzon.cas.inv.warehouse.validators;
 
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.guanzon.appdriver.base.GRiderCAS;
+import org.guanzon.appdriver.base.GuanzonException;
 import org.guanzon.appdriver.constant.UserRight;
 import org.guanzon.appdriver.iface.GValidator;
 import org.guanzon.cas.inv.warehouse.model.Model_Inventory_Count_Detail;
@@ -21,7 +19,7 @@ import org.guanzon.cas.inv.warehouse.status.InventoryCountStatus;
  * @author MNV t4
  */
 public class InventoryCount_MC implements GValidator {
-    
+
     GRiderCAS poGRider;
     String psTranStat;
     JSONObject poJSON;
@@ -74,7 +72,7 @@ public class InventoryCount_MC implements GValidator {
                     poJSON.put("result", "error");
                     poJSON.put("message", "unsupported function");
             }
-        } catch (SQLException ex) {
+        } catch (SQLException | GuanzonException ex) {
             poJSON = new JSONObject();
             poJSON.put("result", "error");
             poJSON.put("message", ex.getMessage());
@@ -83,7 +81,7 @@ public class InventoryCount_MC implements GValidator {
         return poJSON;
     }
 
-    private JSONObject validateNew() throws SQLException {
+    private JSONObject validateNew() throws SQLException, GuanzonException {
         poJSON = new JSONObject();
         boolean isRequiredApproval = false;
 
@@ -121,6 +119,24 @@ public class InventoryCount_MC implements GValidator {
             poJSON.put("result", "error");
             poJSON.put("message", "Inventory Count Type is not set.");
             return poJSON;
+        }
+
+        if (poMaster.InventoryCountType().isAllowBalanceForward()) {
+            if (poMaster.getCutOff() == null) {
+                poJSON.put("result", "error");
+                poJSON.put("message", "Inventory Count Type is balance forward Cut-off Date is required.");
+                return poJSON;
+            }
+        }
+
+        if (poMaster.InventoryCountType().isAllowBalanceForward()) {
+            if (poMaster.getCutOff() != null) {
+                if (poMaster.getCutOff().before(poMaster.getTransactionDate())) {
+                    poJSON.put("result", "error");
+                    poJSON.put("message", "Cut-off Date must be equal to or later than the Transaction Date.");
+                    return poJSON;
+                }
+            }
         }
         //if bypass the rule require approval 
         if (!poMaster.getIncluded().trim().isEmpty()) {
@@ -204,7 +220,6 @@ public class InventoryCount_MC implements GValidator {
 //            isRequiredApproval = true;
 //        }
 
-
         poJSON.put("result", "success");
         poJSON.put("isRequiredApproval", isRequiredApproval);
         return poJSON;
@@ -229,6 +244,7 @@ public class InventoryCount_MC implements GValidator {
         if (poGRider.getUserLevel() <= UserRight.ENCODER) {
             isRequiredApproval = true;
         }
+
         poJSON.put("result", "success");
 //        poJSON.put("isRequiredApproval", isRequiredApproval);
         return poJSON;
