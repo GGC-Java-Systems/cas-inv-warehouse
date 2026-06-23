@@ -804,6 +804,15 @@ public class InventoryCount extends Transaction {
     public JSONObject PostTransaction() throws SQLException, GuanzonException, CloneNotSupportedException {
         poJSON = new JSONObject();
 
+        if (!getMaster().InventoryCountType().isAllowBalanceForward()) {
+            poJSON.put("result", "success");
+            return poJSON;
+        }
+        //must be equal to auto post
+        if (!getMaster().getCutOff().equals((Date) poGRider.getServerDate())) {
+            poJSON.put("result", "success");
+            return poJSON;
+        }
         if (InventoryCountStatus.POSTED.equals((String) poMaster.getValue("cTranStat"))) {
             poJSON.put("result", "success");
             poJSON.put("message", "Transaction was already posted.");
@@ -820,7 +829,7 @@ public class InventoryCount extends Transaction {
 
         poJSON = statusChange(poMaster.getTable(),
                 (String) poMaster.getValue("sTransNox"),
-                "ConfirmTransaction",
+                "Post Transaction",
                 InventoryCountStatus.POSTED,
                 false, true);
         if ("error".equals((String) poJSON.get("result"))) {
@@ -2098,7 +2107,7 @@ public class InventoryCount extends Transaction {
             }
 
             if (!psCategorCD.isEmpty()) {
-                lsSQL += " AND b.sCategrCd = " + SQLUtil.toSQL(psCategorCD);
+                lsSQL += " AND b.sCategCd1 = " + SQLUtil.toSQL(psCategorCD);
             }
 
             // Pre-filter at DB level for BB and C
