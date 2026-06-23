@@ -808,11 +808,11 @@ public class InventoryCount extends Transaction {
             poJSON.put("result", "success");
             return poJSON;
         }
-        //must be equal to auto post
-        if (!getMaster().getCutOff().equals((Date) poGRider.getServerDate())) {
-            poJSON.put("result", "success");
-            return poJSON;
-        }
+//        //must be equal to auto post
+//        if (!getMaster().getCutOff().equals((Date) poGRider.getServerDate())) {
+//            poJSON.put("result", "success");
+//            return poJSON;
+//        }
         if (InventoryCountStatus.POSTED.equals((String) poMaster.getValue("cTranStat"))) {
             poJSON.put("result", "success");
             poJSON.put("message", "Transaction was already posted.");
@@ -824,9 +824,11 @@ public class InventoryCount extends Transaction {
         if ("error".equals((String) poJSON.get("result"))) {
             return poJSON;
         }
-
         poGRider.beginTrans("UPDATE STATUS", "Post Transaction", SOURCE_CODE, getMaster().getTransactionNo());
 
+        poMaster.updateRecord();
+        poMaster.setValue("dCutOffxx", poGRider.getServerDate());
+        poMaster.saveRecord();
         poJSON = statusChange(poMaster.getTable(),
                 (String) poMaster.getValue("sTransNox"),
                 "Post Transaction",

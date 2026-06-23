@@ -121,13 +121,13 @@ public class InventoryCount_Hospitality implements GValidator {
             return poJSON;
         }
 
-        if (poMaster.InventoryCountType().isAllowBalanceForward()) {
-            if (poMaster.getCutOff() == null) {
-                poJSON.put("result", "error");
-                poJSON.put("message", "Inventory Count Type is balance forward Cut-off Date is required.");
-                return poJSON;
-            }
-        }
+//        if (poMaster.InventoryCountType().isAllowBalanceForward()) {
+//            if (poMaster.getCutOff() == null) {
+//                poJSON.put("result", "error");
+//                poJSON.put("message", "Inventory Count Type is balance forward Cut-off Date is required.");
+//                return poJSON;
+//            }
+//        }
 
         if (poMaster.InventoryCountType().isAllowBalanceForward()) {
             if (poMaster.getCutOff() != null) {

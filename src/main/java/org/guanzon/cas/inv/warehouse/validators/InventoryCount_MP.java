@@ -120,14 +120,14 @@ public class InventoryCount_MP implements GValidator {
             poJSON.put("message", "Inventory Count Type is not set.");
             return poJSON;
         }
-
-        if (poMaster.InventoryCountType().isAllowBalanceForward()) {
-            if (poMaster.getCutOff() == null) {
-                poJSON.put("result", "error");
-                poJSON.put("message", "Inventory Count Type is balance forward Cut-off Date is required.");
-                return poJSON;
-            }
-        }
+//
+//        if (poMaster.InventoryCountType().isAllowBalanceForward()) {
+//            if (poMaster.getCutOff() == null) {
+//                poJSON.put("result", "error");
+//                poJSON.put("message", "Inventory Count Type is balance forward Cut-off Date is required.");
+//                return poJSON;
+//            }
+//        }
 
         if (poMaster.InventoryCountType().isAllowBalanceForward()) {
             if (poMaster.getCutOff() != null) {
