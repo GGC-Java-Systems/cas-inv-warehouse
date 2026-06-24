@@ -1,4 +1,3 @@
-
 package org.guanzon.cas.inv.warehouse.status;
 
 import org.guanzon.appdriver.base.MiscUtil;
@@ -10,19 +9,19 @@ import org.guanzon.appdriver.base.SQLUtil;
  */
 public class InventoryCountPrint {
 
-    public static final String MOBILE_PHONE_REPORT = "InventoryCountMP";
-    public static final String MOTORCYCLE_REPORT = "InventoryCountMC";
-    public static final String CAR_REPORT = "InventoryCountCar";
-    public static final String HOSPITALITY_REPORT = "InventoryCountMonarch";
-    public static final String LOS_PEDRITOS_REPORT = "InventoryCountLP";
-    public static final String GENERAL_REPORT = "InventoryCount";
-    public static final String APPLIANCE_REPORT = "InventoryCountAppliance";
+    public static final String MOBILE_PHONE_REPORT = "InventoryCountGeneral";
+    public static final String MOTORCYCLE_REPORT = "InventoryCountGeneral";
+    public static final String CAR_REPORT = "InventoryCountGeneral";
+    public static final String HOSPITALITY_REPORT = "InventoryCountGeneral";
+    public static final String LOS_PEDRITOS_REPORT = "InventoryCountGeneral";
+    public static final String GENERAL_REPORT = "InventoryCountGeneral";
+    public static final String APPLIANCE_REPORT = "InventoryCountGeneral";
 
     public static final String PrintRecordQuery() {
         String lsSQL = "SELECT "
                 + "   InventoryCountMaster.sTransNox sTransNox"
+                + ",  IFNULL(InventoryCountDetail.nEntryNox,'') nEntryNox"
                 + ",  IFNULL(InventoryCountDetail.sStockIDx,'') sStockIDx"
-                + ",  TRIM(CONCAT(IFNULL (InventorySerial.sSerial01, ''),IF(InventorySerial.sSerial01 IS NOT NULL AND InventorySerial.sSerial02 IS NOT NULL,'/ ',''),IFNULL (InventorySerial.sSerial02, '')))  xSerialNme"
                 + ",  IFNULL(Inventory.sBarCodex,'') Barcode"
                 + ",  IFNULL(Inventory.sDescript,'') InventoryName"
                 + ",  IFNULL(Brand.sDescript,'') BrandName"
@@ -31,15 +30,15 @@ public class InventoryCountPrint {
                 + ",  IFNULL(Measure.sDescript,'') MeasureName"
                 + ",  IFNULL(InventoryType.sDescript,'') InventoryTypeName"
                 + ",  IFNULL(Variant.sDescript,'') VariantName"
-                + ",  InventoryCountDetail.nQuantity nQuantity"
+                + ",  CASE WHEN InventoryCountMaster.nCounterx >= 3 THEN IFNULL(InventoryCountDetail.sRemarksx, '') ELSE '' END sRemarksx"
+                + ",  CASE WHEN InventoryCountMaster.nCounterx >= 1 THEN IFNULL(InventoryCountDetail.nActCtr01, '') ELSE '' END nActCtr01"
+                + ",  CASE WHEN InventoryCountMaster.nCounterx >= 2 THEN IFNULL(InventoryCountDetail.nActCtr02, '') ELSE '' END nActCtr02"
+                + ",  CASE WHEN InventoryCountMaster.nCounterx >= 3 THEN IFNULL(InventoryCountDetail.nActCtr03, '') ELSE '' END nActCtr03"
                 + "   FROM Inventory_Count_Master InventoryCountMaster"
                 + "     LEFT JOIN Inventory_Count_Detail InventoryCountDetail"
                 + "         ON InventoryCountMaster.sTransNox = InventoryCountDetail.sTransNox"
                 + "     LEFT JOIN Inventory Inventory"
                 + "         ON InventoryCountDetail.sStockIDx = Inventory.sStockIDx"
-                + "     LEFT JOIN Inv_Serial InventorySerial"
-                + "         ON Inventory.sStockIDx = InventorySerial.sStockIDx "
-                + "             AND InventoryCountDetail.sSerialID = InventorySerial.sSerialID "
                 + "     LEFT JOIN Category Category"
                 + "         ON Inventory.sCategCd1 = Category.sCategrCd"
                 + "     LEFT JOIN Category_Level2 Category_Level2"
@@ -61,6 +60,66 @@ public class InventoryCountPrint {
                 + "     LEFT JOIN Model_Variant Variant"
                 + "         ON Inventory.sVrntIDxx = Variant.sVrntIDxx"
                 + "             ORDER BY InventoryCountDetail.nEntryNox ASC";
+
+        return lsSQL;
+    }
+
+    public static final String PrintReportQuery() {
+
+        String lsSQL = "SELECT "
+                + "  IFNULL(Inventory.sBarCodex,'') AS Barcode "
+                + ", IFNULL(Inventory.sDescript,'') AS InventoryName "
+                + ", IFNULL(Brand.sDescript,'') AS BrandName "
+                + ", IFNULL(Measure.sDescript,'') AS MeasureName "
+                + ", IFNULL(InvLocation.sDescript,'') AS InvLocationName "
+                + ", CASE "
+                + "      WHEN InventoryCountMaster.nCounterx = 3 THEN IFNULL(InventoryCountDetail.nActCtr03,0) "
+                + "      WHEN InventoryCountMaster.nCounterx = 2 THEN IFNULL(InventoryCountDetail.nActCtr02,0) "
+                + "      WHEN InventoryCountMaster.nCounterx = 1 THEN IFNULL(InventoryCountDetail.nActCtr01,0) "
+                + "      ELSE 0 "
+                + "   END AS nActCtrFnal "
+                + ", IFNULL(InventoryCountDetail.nQtyOnHnd,0) AS nQtyOnHnd "
+                + ", (IFNULL(InventoryCountDetail.nQtyOnHnd,0) - "
+                + "    CASE "
+                + "      WHEN InventoryCountMaster.nCounterx = 3 THEN IFNULL(InventoryCountDetail.nActCtr03,0) "
+                + "      WHEN InventoryCountMaster.nCounterx = 2 THEN IFNULL(InventoryCountDetail.nActCtr02,0) "
+                + "      WHEN InventoryCountMaster.nCounterx = 1 THEN IFNULL(InventoryCountDetail.nActCtr01,0) "
+                + "      ELSE 0 "
+                + "    END) AS QtyVariance "
+                + ", IFNULL(InventoryCountMaster.sRemarksx,'') AS Remarks "
+                + ", CASE "
+                + "      WHEN (IFNULL(InventoryCountDetail.nQtyOnHnd,0) - "
+                + "            CASE "
+                + "               WHEN InventoryCountMaster.nCounterx = 3 THEN IFNULL(InventoryCountDetail.nActCtr03,0) "
+                + "               WHEN InventoryCountMaster.nCounterx = 2 THEN IFNULL(InventoryCountDetail.nActCtr02,0) "
+                + "               WHEN InventoryCountMaster.nCounterx = 1 THEN IFNULL(InventoryCountDetail.nActCtr01,0) "
+                + "               ELSE 0 "
+                + "            END) < 0 "
+                + "           THEN 'Added' "
+                + "      WHEN (IFNULL(InventoryCountDetail.nQtyOnHnd,0) - "
+                + "            CASE "
+                + "               WHEN InventoryCountMaster.nCounterx = 3 THEN IFNULL(InventoryCountDetail.nActCtr03,0) "
+                + "               WHEN InventoryCountMaster.nCounterx = 2 THEN IFNULL(InventoryCountDetail.nActCtr02,0) "
+                + "               WHEN InventoryCountMaster.nCounterx = 1 THEN IFNULL(InventoryCountDetail.nActCtr01,0) "
+                + "               ELSE 0 "
+                + "            END) > 0 "
+                + "           THEN 'Deducted' "
+                + "      ELSE 'No Adjustment' "
+                + "   END AS AdjustmentType "
+                + "FROM Inventory_Count_Master InventoryCountMaster "
+                + "LEFT JOIN Inventory_Count_Detail InventoryCountDetail "
+                + "       ON InventoryCountMaster.sTransNox = InventoryCountDetail.sTransNox "
+                + "LEFT JOIN Inventory Inventory "
+                + "       ON InventoryCountDetail.sStockIDx = Inventory.sStockIDx "
+                + "LEFT JOIN Brand Brand "
+                + "       ON Inventory.sBrandIDx = Brand.sBrandIDx "
+                + "LEFT JOIN Measure Measure "
+                + "       ON Inventory.sMeasurID = Measure.sMeasurID "
+                + "LEFT JOIN Inv_Master InvMaster "
+                + "       ON Inventory.sStockIDx = InvMaster.sStockIDx "
+                + "LEFT JOIN Inv_Location InvLocation "
+                + "       ON InvLocation.sLocatnID = InvMaster.sLocatnID "
+                + "ORDER BY InvLocation.sDescript ASC";
 
         return lsSQL;
     }

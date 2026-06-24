@@ -186,15 +186,6 @@ public class Model_Inventory_Count_Detail extends Model {
         return (String) getValue("sRemarksx");
     }
 
-    //sModified
-    public JSONObject setModifyingId(String modifyingId) {
-        return setValue("sModified", modifyingId);
-    }
-
-    public String getModifyingId() {
-        return (String) getValue("sModified");
-    }
-
     //dModified
     public JSONObject setModifiedDate(Date modifiedDate) {
         return setValue("dModified", modifiedDate);

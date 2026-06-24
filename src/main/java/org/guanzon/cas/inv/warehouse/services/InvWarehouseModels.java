@@ -3,6 +3,7 @@ package org.guanzon.cas.inv.warehouse.services;
 import org.guanzon.appdriver.base.GRiderCAS;
 import org.guanzon.cas.inv.warehouse.model.Model_Inv_Stock_Request_Detail;
 import org.guanzon.cas.inv.warehouse.model.Model_Inv_Stock_Request_Master;
+import org.guanzon.cas.inv.warehouse.model.Model_Inventory_Adjustment;
 import org.guanzon.cas.inv.warehouse.model.Model_Inventory_Count_Detail;
 import org.guanzon.cas.inv.warehouse.model.Model_Inventory_Count_Master;
 
@@ -79,10 +80,28 @@ public class InvWarehouseModels {
         return poInventoryCountDetail;
     }
     
+      public Model_Inventory_Adjustment InventoryAdjustment(){
+        if (poGRider == null){
+            System.err.println("InvWarehouseModels.ModelInventoryAdjustment: Application driver is not set.");
+            return null;
+        }
+        
+        if (poInventoryAdjustment == null){
+            poInventoryAdjustment = new Model_Inventory_Adjustment();
+            poInventoryAdjustment.setApplicationDriver(poGRider);
+            poInventoryAdjustment.setXML("Model_Inventory_Adjustment");
+            poInventoryAdjustment.setTableName("Inventory_Adjustment");
+            poInventoryAdjustment.initialize();
+        }
+
+        return poInventoryAdjustment;
+    }
+    
     private final GRiderCAS poGRider;
     
     private Model_Inv_Stock_Request_Master poInvRequestMaster;
     private Model_Inv_Stock_Request_Detail poInvRequestDetail;
     private Model_Inventory_Count_Master poInventoryCountMaster;
     private Model_Inventory_Count_Detail poInventoryCountDetail;
+    private Model_Inventory_Adjustment poInventoryAdjustment;
 }
