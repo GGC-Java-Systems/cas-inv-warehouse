@@ -64,6 +64,66 @@ public class InventoryCountPrint {
         return lsSQL;
     }
 
+    public static final String PrintReportQuery() {
+
+        String lsSQL = "SELECT "
+                + "  IFNULL(Inventory.sBarCodex,'') AS Barcode "
+                + ", IFNULL(Inventory.sDescript,'') AS InventoryName "
+                + ", IFNULL(Brand.sDescript,'') AS BrandName "
+                + ", IFNULL(Measure.sDescript,'') AS MeasureName "
+                + ", IFNULL(InvLocation.sDescript,'') AS InvLocationName "
+                + ", CASE "
+                + "      WHEN InventoryCountMaster.nCounterx = 3 THEN IFNULL(InventoryCountDetail.nActCtr03,0) "
+                + "      WHEN InventoryCountMaster.nCounterx = 2 THEN IFNULL(InventoryCountDetail.nActCtr02,0) "
+                + "      WHEN InventoryCountMaster.nCounterx = 1 THEN IFNULL(InventoryCountDetail.nActCtr01,0) "
+                + "      ELSE 0 "
+                + "   END AS nActCtrFnal "
+                + ", IFNULL(InventoryCountDetail.nQtyOnHnd,0) AS nQtyOnHnd "
+                + ", (IFNULL(InventoryCountDetail.nQtyOnHnd,0) - "
+                + "    CASE "
+                + "      WHEN InventoryCountMaster.nCounterx = 3 THEN IFNULL(InventoryCountDetail.nActCtr03,0) "
+                + "      WHEN InventoryCountMaster.nCounterx = 2 THEN IFNULL(InventoryCountDetail.nActCtr02,0) "
+                + "      WHEN InventoryCountMaster.nCounterx = 1 THEN IFNULL(InventoryCountDetail.nActCtr01,0) "
+                + "      ELSE 0 "
+                + "    END) AS QtyVariance "
+                + ", IFNULL(InventoryCountMaster.sRemarksx,'') AS Remarks "
+                + ", CASE "
+                + "      WHEN (IFNULL(InventoryCountDetail.nQtyOnHnd,0) - "
+                + "            CASE "
+                + "               WHEN InventoryCountMaster.nCounterx = 3 THEN IFNULL(InventoryCountDetail.nActCtr03,0) "
+                + "               WHEN InventoryCountMaster.nCounterx = 2 THEN IFNULL(InventoryCountDetail.nActCtr02,0) "
+                + "               WHEN InventoryCountMaster.nCounterx = 1 THEN IFNULL(InventoryCountDetail.nActCtr01,0) "
+                + "               ELSE 0 "
+                + "            END) < 0 "
+                + "           THEN 'Added' "
+                + "      WHEN (IFNULL(InventoryCountDetail.nQtyOnHnd,0) - "
+                + "            CASE "
+                + "               WHEN InventoryCountMaster.nCounterx = 3 THEN IFNULL(InventoryCountDetail.nActCtr03,0) "
+                + "               WHEN InventoryCountMaster.nCounterx = 2 THEN IFNULL(InventoryCountDetail.nActCtr02,0) "
+                + "               WHEN InventoryCountMaster.nCounterx = 1 THEN IFNULL(InventoryCountDetail.nActCtr01,0) "
+                + "               ELSE 0 "
+                + "            END) > 0 "
+                + "           THEN 'Deducted' "
+                + "      ELSE 'No Adjustment' "
+                + "   END AS AdjustmentType "
+                + "FROM Inventory_Count_Master InventoryCountMaster "
+                + "LEFT JOIN Inventory_Count_Detail InventoryCountDetail "
+                + "       ON InventoryCountMaster.sTransNox = InventoryCountDetail.sTransNox "
+                + "LEFT JOIN Inventory Inventory "
+                + "       ON InventoryCountDetail.sStockIDx = Inventory.sStockIDx "
+                + "LEFT JOIN Brand Brand "
+                + "       ON Inventory.sBrandIDx = Brand.sBrandIDx "
+                + "LEFT JOIN Measure Measure "
+                + "       ON Inventory.sMeasurID = Measure.sMeasurID "
+                + "LEFT JOIN Inv_Master InvMaster "
+                + "       ON Inventory.sStockIDx = InvMaster.sStockIDx "
+                + "LEFT JOIN Inv_Location InvLocation "
+                + "       ON InvLocation.sLocatnID = InvMaster.sLocatnID "
+                + "ORDER BY InvLocation.sDescript ASC";
+
+        return lsSQL;
+    }
+
     public static String getJasperReport(String psIndustryCode) {
         switch (psIndustryCode) {
             case "01":
