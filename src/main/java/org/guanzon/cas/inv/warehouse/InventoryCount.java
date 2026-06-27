@@ -347,7 +347,7 @@ public class InventoryCount extends Transaction {
     public JSONObject UpdateTransaction() {
         poJSON = new JSONObject();
 
-        if (InventoryCountStatus.CONFIRMED.equals((String) poMaster.getValue("cTranStat"))) {
+        if (InventoryCountStatus.VERIFIED.equals((String) poMaster.getValue("cTranStat"))) {
             poJSON.put("result", "error");
             poJSON.put("message", "Transaction was already confirmed.");
             return poJSON;
@@ -376,6 +376,7 @@ public class InventoryCount extends Transaction {
             poJSON.put("message", "Transaction was already cancelled.");
             return poJSON;
         }
+
         getMaster().setCounterNo(getMaster().getCounterNo() + 1);
         return updateTransaction();
     }
@@ -675,7 +676,7 @@ public class InventoryCount extends Transaction {
 
                     //check if authorization request is already approved by all authorizing personnel
                     if (!check.isAuthOkay()) {
-                        poGRider.beginTrans("UPDATE STATUS", "ConfirmTransaction", SOURCE_CODE, getMaster().getTransactionNo());
+                        poGRider.beginTrans("UPDATE STATUS", "Verify Transaction", SOURCE_CODE, getMaster().getTransactionNo());
 
                         lsStatus = Character.toString((char) (64 + Integer.parseInt(lsStatus)));
                         poJSON = statusChange(poMaster.getTable(), (String) poMaster.getValue("sTransNox"), "", lsStatus, !lbConfirm, true);
@@ -702,7 +703,7 @@ public class InventoryCount extends Transaction {
 
 //========================================Authority Check End===============================================
         if (!pbWthParent) {
-            poGRider.beginTrans("UPDATE STATUS", "Post Transaction", SOURCE_CODE, getMaster().getTransactionNo());
+            poGRider.beginTrans("UPDATE STATUS", "Verify  Transaction", SOURCE_CODE, getMaster().getTransactionNo());
         }
 
         poJSON = statusChange(poMaster.getTable(), (String) poMaster.getValue("sTransNox"), "", lsStatus, !lbConfirm, true);
@@ -803,11 +804,11 @@ public class InventoryCount extends Transaction {
 
     public JSONObject PostTransaction() throws SQLException, GuanzonException, CloneNotSupportedException {
         poJSON = new JSONObject();
-
-        if (!getMaster().InventoryCountType().isAllowBalanceForward()) {
-            poJSON.put("result", "success");
-            return poJSON;
-        }
+//
+//        if (!getMaster().InventoryCountType().isAllowBalanceForward()) {
+//            poJSON.put("result", "success");
+//            return poJSON;
+//        }
 //        //must be equal to auto post
 //        if (!getMaster().getCutOff().equals((Date) poGRider.getServerDate())) {
 //            poJSON.put("result", "success");
