@@ -223,7 +223,7 @@ public class InventoryCount extends Transaction {
             return poJSON;
         }
 
-//        getMaster().setIndustryId(psIndustryCode);
+        getMaster().setIndustryId(psIndustryCode);
 //        getMaster().setCompanyID(psCompanyID);
         getMaster().setCategoryId(psCategorCD);
         getMaster().setBranchCode(poGRider.getBranchCode());
