@@ -1315,7 +1315,7 @@ public class InventoryCount extends Transaction {
 
         if (InventoryCountStatus.POSTED.equals((String) poMaster.getValue("cTranStat"))) {
             poJSON.put("result", "error");
-            poJSON.put("message", "Transaction was already Processed.");
+            poJSON.put("message", "Transaction was already posted.");
             return poJSON;
         }
 //
@@ -1437,6 +1437,153 @@ public class InventoryCount extends Transaction {
 
         System.out.println(
                 "Print Data Query :" + lsSQL);
+
+        //process by JasperCollection parse ur List / ArrayList
+        //JRBeanCollectionDataSource jrRS = new JRBeanCollectionDataSource(R1data);
+        //poReportJasper.setJRBeanCollectionDataSource(jrRS);
+        //direct pass JasperViewer
+        //         reportPrint = JasperFillManager.fillReport(poGRider.getReportPath() + psJasperPath + ".jasper",
+        //                    poParamater,
+        //                    yourDATA);
+        //        poReportJasper.setJasperPrint(report0Print);
+        poReportJasper.isAlwaysTop(false);
+        poReportJasper.isWithUI(true);
+        poReportJasper.isWithExport(true);
+        poReportJasper.isWithExportPDF(true);
+        poReportJasper.willExport(true);
+        return poReportJasper.generateReport();
+
+    }
+
+    public JSONObject printRecordFiltered() throws SQLException, JRException, CloneNotSupportedException, GuanzonException {
+
+        poJSON = new JSONObject();
+
+        if (InventoryCountStatus.POSTED.equals((String) poMaster.getValue("cTranStat"))) {
+            poJSON.put("result", "error");
+            poJSON.put("message", "Transaction was already posted.");
+            return poJSON;
+        }
+//
+//        if (InventoryCountStatus.CONFIRMED.equals((String) poMaster.getValue("cTranStat"))) {
+//            poJSON.put("result", "error");
+//            poJSON.put("message", "Transaction was already confirmed.");
+//            return poJSON;
+//        }
+
+        if (InventoryCountStatus.CANCELLED.equals((String) poMaster.getValue("cTranStat"))) {
+            poJSON.put("result", "error");
+            poJSON.put("message", "Transaction was already cancelled.");
+            return poJSON;
+        }
+
+        poJSON = isEntryOkay(InventoryCountStatus.CONFIRMED);
+        if ("error".equals((String) poJSON.get("result"))) {
+            return poJSON;
+        }
+
+        ReportUtil poReportJasper = new ReportUtil(poGRider);
+
+        if (psCategorCD == null && psCategorCD.isEmpty()) {
+            poJSON.put("result", "error");
+            poJSON.put("message", "Category is Required for this Transaction");
+            return poJSON;
+        }
+        if (getMaster().getTransactionNo() == null && getMaster().getTransactionNo().isEmpty()) {
+            poJSON.put("result", "error");
+            poJSON.put("message", "No record is Selected");
+            return poJSON;
+
+        }
+        poJSON = OpenTransaction(getMaster().getTransactionNo());
+        if ("error".equals((String) poJSON.get("result"))) {
+            System.out.println("Print Record open transaction : " + (String) poJSON.get("message"));
+            return poJSON;
+        }
+
+        // Attach listener
+        poReportJasper.setReportListener(new ReportUtilListener() {
+            @Override
+            public void onReportOpen() {
+                System.out.println("Report opened.");
+            }
+
+            @Override
+            public void onReportClose() {
+                //fetch/add if needed
+                System.out.println("Report closed.");
+            }
+
+            @Override
+            public void onReportPrint() {
+                System.out.println("Report printing...");
+                try {
+                    if (pbWthParent) {
+                        poGRider.beginTrans("UPDATE STATUS", "Process Transaction Print Tag", SOURCE_CODE, getMaster().getTransactionNo());
+                    }
+
+                    if (getMaster().getTransactionStatus().equals(InventoryCountStatus.OPEN)) {
+                        if (!isJSONSuccess(CloseTransaction(), "Print Record",
+                                "Initialize Close Transaction! ")) {
+                        }
+                    }
+
+                    if (pbWthParent) {
+                        poGRider.commitTrans();
+                    }
+                    poReportJasper.CloseReportUtil();
+
+                } catch (SQLException | GuanzonException | CloneNotSupportedException ex) {
+                    Logger.getLogger(InventoryRequestApproval.class
+                            .getName()).log(Level.SEVERE, null, ex);
+                    ShowMessageFX.Error("", "", ex.getMessage());
+                }
+            }
+
+            @Override
+            public void onReportExport() {
+                System.out.println("Report exported.");
+                if (!isJSONSuccess(poReportJasper.exportReportbyExcel(), "Export Record",
+                        "Initialize Record Export! ")) {
+                    return;
+                }
+
+//                poReportJasper.CloseReportUtil();
+                //if used a model or array please create function 
+            }
+
+            @Override
+            public void onReportExportPDF() {
+                System.out.println("Report exported.");
+//                poReportJasper.CloseReportUtil();
+            }
+
+        }
+        );
+        //add Parameter
+        poReportJasper.addParameter("sReportNm", "Inventory Count AS OF - " + SQLUtil.dateFormat(getMaster().getTransactionDate(), SQLUtil.FORMAT_LONG_DATE));
+        poReportJasper.addParameter("sBranchNm", poGRider.getBranchName());
+        poReportJasper.addParameter("sAddressx", poGRider.getAddress());
+        poReportJasper.addParameter("sCompnyNm", poGRider.getClientName());
+        poReportJasper.addParameter("sTransNox", getMaster().getTransactionNo());
+        poReportJasper.addParameter("sRemarksx", getMaster().getRemarks() == null ? "" : getMaster().getRemarks());
+        poReportJasper.addParameter("DatePrinted", SQLUtil.dateFormat(poGRider.getServerDate(), SQLUtil.FORMAT_TIMESTAMP));
+        poReportJasper.addParameter("watermarkImagePath", poGRider.getReportPath() + "images\\blank.png");
+
+        poReportJasper.addParameter("sPrintdBy", poGRider.getClientName() == null ? "" : poGRider.getClientName());
+
+        poReportJasper.setReportName("Inventory Count AS OF - " + SQLUtil.dateFormat(getMaster().getTransactionDate(), SQLUtil.FORMAT_LONG_DATE));
+        poReportJasper.setJasperPath(InventoryCountPrint.getJasperReport(psIndustryCode));
+
+        //process by ResultSet
+        String lsSQL = InventoryCountPrint.PrintRecordQuery();
+        lsSQL = MiscUtil.addCondition(lsSQL, "InventoryCountMaster.sTransNox = " + SQLUtil.toSQL(getMaster().getTransactionNo()) 
+                + " HAVING nVariance <> 0 ");
+        
+
+        poReportJasper.setSQLReport(lsSQL);
+
+        System.out.println("Print Data Query Filtered:" + lsSQL);
 
         //process by JasperCollection parse ur List / ArrayList
         //JRBeanCollectionDataSource jrRS = new JRBeanCollectionDataSource(R1data);
