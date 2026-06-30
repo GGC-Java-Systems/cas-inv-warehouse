@@ -29,8 +29,8 @@ public class Model_Inventory_Count_Master extends Model {
     //reference objects
     Model_Category poCategory;
     Model_Branch poBranch;
-//    Model_Industry poIndustry;
-    Model_Company poCompany;
+    Model_Industry poIndustry;
+//    Model_Company poCompany;
     Model_Inventory_Count_Type poInventoryCountType;
     Model_Client_Master poRequestedBy;
 
@@ -55,8 +55,8 @@ public class Model_Inventory_Count_Master extends Model {
 
             this.poRequestedBy = (new ClientModels(this.poGRider)).ClientMaster();
             this.poBranch = (new ParamModels(this.poGRider)).Branch();
-            this.poCompany = (new ParamModels(this.poGRider)).Company();
-//            this.poIndustry = (new ParamModels(this.poGRider)).Industry();
+//            this.poCompany = (new ParamModels(this.poGRider)).Company();
+            this.poIndustry = (new ParamModels(this.poGRider)).Industry();
             this.poCategory = (new ParamModels(this.poGRider)).Category();
             this.poInventoryCountType = (new ParamModels(this.poGRider)).InventoryCountType();
 
@@ -103,14 +103,14 @@ public class Model_Inventory_Count_Master extends Model {
         return (String) getValue("sTransNox");
     }
 
-//    //sIndstCdx
-//    public JSONObject setIndustryId(String industryId) {
-//        return setValue("sIndstCdx", industryId);
-//    }
-//
-//    public String getIndustryId() {
-//        return (String) getValue("sIndstCdx");
-//    }
+    //sIndstCdx
+    public JSONObject setIndustryId(String industryId) {
+        return setValue("sIndstCdx", industryId);
+    }
+
+    public String getIndustryId() {
+        return (String) getValue("sIndstCdx");
+    }
 
     //sBranchCd
     public JSONObject setBranchCode(String branchCode) {
@@ -138,7 +138,6 @@ public class Model_Inventory_Count_Master extends Model {
     public Date getTransactionDate() {
         return (Date) getValue("dTransact");
     }
-
 
     //sRemarksx
     public JSONObject setRemarks(String remarks) {
@@ -211,7 +210,6 @@ public class Model_Inventory_Count_Master extends Model {
     public int getCounterNo() {
         return (int) getValue("nCounterx");
     }
-
 
     //cTranStat
     public JSONObject setTransactionStatus(String transactionStatus) {
@@ -313,38 +311,38 @@ public class Model_Inventory_Count_Master extends Model {
         return this.poBranch;
     }
 
-    public Model_Company Company() throws SQLException, GuanzonException {
-        if (!"".equals(getValue("sCompnyID"))) {
-            if (this.poCompany.getEditMode() == 1 && this.poCompany
-                    .getCompanyId().equals(getValue("sCompnyID"))) {
-                return this.poCompany;
-            }
-            this.poJSON = this.poCompany.openRecord((String) getValue("sCompnyID"));
-            if ("success".equals(this.poJSON.get("result"))) {
-                return this.poCompany;
-            }
-            this.poCompany.initialize();
-            return this.poCompany;
-        }
-        this.poCompany.initialize();
-        return this.poCompany;
-    }
-
-//    public Model_Industry Industry() throws SQLException, GuanzonException {
-//        if (!"".equals(getValue("sIndstCdx"))) {
-//            if (this.poIndustry.getEditMode() == 1 && this.poIndustry
-//                    .getIndustryId().equals(getValue("sIndstCdx"))) {
-//                return this.poIndustry;
+//    public Model_Company Company() throws SQLException, GuanzonException {
+//        if (!"".equals(getValue("sCompnyID"))) {
+//            if (this.poCompany.getEditMode() == 1 && this.poCompany
+//                    .getCompanyId().equals(getValue("sCompnyID"))) {
+//                return this.poCompany;
 //            }
-//            this.poJSON = this.poIndustry.openRecord((String) getValue("sIndstCdx"));
+//            this.poJSON = this.poCompany.openRecord((String) getValue("sCompnyID"));
 //            if ("success".equals(this.poJSON.get("result"))) {
-//                return this.poIndustry;
+//                return this.poCompany;
 //            }
-//            this.poIndustry.initialize();
-//            return this.poIndustry;
+//            this.poCompany.initialize();
+//            return this.poCompany;
 //        }
-//        this.poIndustry.initialize();
-//        return this.poIndustry;
+//        this.poCompany.initialize();
+//        return this.poCompany;
 //    }
+
+    public Model_Industry Industry() throws SQLException, GuanzonException {
+        if (!"".equals(getValue("sIndstCdx"))) {
+            if (this.poIndustry.getEditMode() == 1 && this.poIndustry
+                    .getIndustryId().equals(getValue("sIndstCdx"))) {
+                return this.poIndustry;
+            }
+            this.poJSON = this.poIndustry.openRecord((String) getValue("sIndstCdx"));
+            if ("success".equals(this.poJSON.get("result"))) {
+                return this.poIndustry;
+            }
+            this.poIndustry.initialize();
+            return this.poIndustry;
+        }
+        this.poIndustry.initialize();
+        return this.poIndustry;
+    }
 
 }
