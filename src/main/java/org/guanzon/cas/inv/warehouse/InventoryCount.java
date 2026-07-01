@@ -1577,9 +1577,8 @@ public class InventoryCount extends Transaction {
 
         //process by ResultSet
         String lsSQL = InventoryCountPrint.PrintRecordQuery();
-        lsSQL = MiscUtil.addCondition(lsSQL, "InventoryCountMaster.sTransNox = " + SQLUtil.toSQL(getMaster().getTransactionNo()) 
+        lsSQL = MiscUtil.addCondition(lsSQL, "InventoryCountMaster.sTransNox = " + SQLUtil.toSQL(getMaster().getTransactionNo())
                 + " HAVING nVariance <> 0 ");
-        
 
         poReportJasper.setSQLReport(lsSQL);
 
@@ -2138,6 +2137,32 @@ public class InventoryCount extends Transaction {
             return poJSON;
 
         }
+    }
+
+    public JSONObject loadInventoryCountType() throws SQLException, GuanzonException {
+        poJSON = new JSONObject();
+        InventoryCountType loSubClass = new ParamControllers(poGRider, logwrapr).InventoryCountType();
+        loSubClass.setRecordStatus(RecordStatus.ACTIVE);
+
+        String lsSQL = MiscUtil.addCondition(loSubClass.getSQ_Browse(), "cRecdStat = " + SQLUtil.toSQL(RecordStatus.ACTIVE));
+        lsSQL = MiscUtil.addCondition(lsSQL, "sIndstCdx = " + SQLUtil.toSQL(poGRider.getIndustry()));
+        lsSQL = MiscUtil.addCondition(lsSQL, "sDescript = " + SQLUtil.toSQL("BRANCH AUDIT"));
+
+        ResultSet loRS = poGRider.executeQuery(lsSQL);
+        if (MiscUtil.RecordCount(loRS) <= 0) {
+            poJSON.put("result", "error");
+            poJSON.put("message", "No Branch Audit Inventory Count Type found. Please inform Compliance Management Dept.");
+            return poJSON;
+        }
+        loRS.absolute(1);
+        poJSON = loSubClass.openRecord(loRS.getString("sInvCtrID"));
+        System.out.println("result " + (String) poJSON.get("result"));
+        if ("success".equals((String) poJSON.get("result"))) {
+            getMaster().setInventoryCounterID(loSubClass.getModel().getInventoryCountID());
+            poJSON = new JSONObject();
+            poJSON.put("result", "success");
+        }
+        return poJSON;
     }
 
     public JSONObject searchInventoryCountType(String value, boolean byCode) throws SQLException, GuanzonException {

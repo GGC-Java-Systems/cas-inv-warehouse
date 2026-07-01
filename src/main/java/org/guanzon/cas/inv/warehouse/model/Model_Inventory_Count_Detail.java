@@ -41,7 +41,6 @@ public class Model_Inventory_Count_Detail extends Model {
             poEntity.absolute(1);
 
             poEntity.updateObject("nEntryNox", 1);
-            poEntity.updateNull("sStockIDx");
             poEntity.updateNull("sBinIDxxx");
             poEntity.updateNull("sWHouseID");
             poEntity.updateNull("sSectnIDx");
